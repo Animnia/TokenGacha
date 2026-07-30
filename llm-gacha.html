@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TokenGacha · LLM API 中转站</title>
+<style>
+:root{
+  --bg:#f2f4fa; --panel:#ffffff; --panel2:#f7f9fd; --line:#e3e8f2; --line2:#edf0f8;
+  --txt:#1c2340; --dim:#67719a; --faint:#9aa4c8;
+  --blue:#2f6bff; --blue-d:#1f53d8; --green:#16a34a; --red:#dc2626; --gold:#d97706; --cyan:#0891b2;
+  --N:#94a3b8; --R:#3b82f6; --SR:#9333ea; --SSR:#f59e0b;
+  --UR1:#ff5f6d; --UR2:#f59e0b; --UR3:#2f6bff;
+  --shadow:0 1px 2px rgba(28,35,64,.05),0 6px 18px rgba(28,35,64,.06);
+  --shadow-lg:0 4px 8px rgba(28,35,64,.06),0 16px 40px rgba(28,35,64,.12);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--bg);color:var(--txt);
+  font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  min-height:100vh;
+}
+body.shake{animation:shake .45s}
+@keyframes shake{0%,100%{transform:translate(0)}20%{transform:translate(-8px,4px)}40%{transform:translate(7px,-5px)}60%{transform:translate(-5px,-3px)}80%{transform:translate(4px,3px)}}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#c6cdea;border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+img{user-select:none;-webkit-user-drag:none}
+a{color:var(--blue)}
+.mono{font-variant-numeric:tabular-nums;font-family:"Cascadia Code",Consolas,ui-monospace,monospace}
+
+/* ---------- header ---------- */
+header{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:0 22px;height:60px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.logo{font-size:17px;font-weight:900;letter-spacing:.3px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.logo .mark{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--blue),#7c3aed);display:flex;align-items:center;justify-content:center;font-size:14px}
+.logo small{font-size:11px;color:var(--faint);font-weight:500;letter-spacing:1.5px}
+.top-nav{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px}
+.top-nav button{padding:7px 18px;border-radius:8px;font-size:13.5px;font-weight:700;color:var(--dim);transition:.15s}
+.top-nav button.active{background:var(--panel);color:var(--blue);box-shadow:0 1px 4px rgba(28,35,64,.12)}
+.top-nav button:hover:not(.active){color:var(--txt)}
+.stat-chips{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:5px 12px;font-size:11px;color:var(--faint);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.chip b{font-size:14px;color:var(--txt);font-variant-numeric:tabular-nums}
+.chip.money{background:#fffbeb;border-color:#fde68a}
+.chip.money b{color:var(--gold);font-size:15px}
+.chip b.flash-up{animation:flashUp .5s}
+.chip b.flash-down{animation:flashDown .5s}
+@keyframes flashUp{0%{color:var(--green);transform:scale(1.2)}100%{}}
+@keyframes flashDown{0%{color:var(--red);transform:scale(1.2)}100%{}}
+.hbtn{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 11px;font-size:12.5px;color:var(--dim);transition:.15s;white-space:nowrap}
+.hbtn:hover{color:var(--txt);border-color:#c9d2ea;background:#fff}
+
+/* ---------- pages ---------- */
+main{max-width:1180px;margin:0 auto;padding:14px 22px 26px}
+.page{display:none;animation:pageIn .25s}
+.page.active{display:block}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px)}}
+.page-head{margin-bottom:12px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.page-head h2{font-size:20px;font-weight:900}
+.page-head p{font-size:12.5px;color:var(--dim)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.panel-pad{padding:13px}
+.panel-title{font-size:13px;font-weight:800;color:var(--dim);letter-spacing:1px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.panel-title .right{margin-left:auto;font-weight:500;font-size:12px;letter-spacing:0;color:var(--faint)}
+
+.notice{background:#fffbeb;border:1px solid #fde68a;color:#92600a;border-radius:12px;padding:7px 13px;font-size:12px;margin-bottom:12px;display:flex;gap:8px;align-items:center}
+.notice .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulseDot 1.6s infinite;flex-shrink:0}
+@keyframes pulseDot{50%{opacity:.35}}
+
+/* ---------- 购买Token: 池卡 ---------- */
+.pool-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:900px){.pool-cards{grid-template-columns:1fr}}
+.pool-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;transition:.18s;position:relative;display:flex;flex-direction:column}
+.pool-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.pool-card .accent{height:5px;background:var(--pc)}
+.pool-card.rec::after{content:'★ 热门';position:absolute;top:14px;right:14px;background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px}
+.pool-body{padding:13px 14px;gap:7px;flex:1;display:flex;flex-direction:column}
+.pool-name{font-size:16px;font-weight:900;display:flex;align-items:center;gap:8px}
+.pool-sub{font-size:11.5px;color:var(--faint)}
+.pool-price{display:flex;align-items:baseline;gap:6px}
+.pool-price b{font-size:22px;font-weight:900;color:var(--txt);font-variant-numeric:tabular-nums}
+.pool-price span{font-size:12px;color:var(--faint)}
+.rtp-tag{margin-left:auto;font-size:10.5px;background:#ecfdf5;color:#15803d;border:1px solid #bbf7d0;padding:2px 8px;border-radius:8px;font-weight:700}
+.rtp-tag.low{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+.featured-row{display:flex;gap:6px;align-items:center}
+.featured-row img{width:26px;height:26px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:3px}
+.featured-row span{font-size:10.5px;color:var(--faint);margin-left:2px}
+.rates-bar{display:flex;height:7px;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.rates-bar i{display:block;height:100%}
+.rates-legend{display:flex;gap:8px;flex-wrap:wrap;font-size:9.5px;color:var(--faint)}
+.pity-row{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--dim)}
+.pity-bar{flex:1;height:7px;background:var(--panel2);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.pity-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--SR),var(--SSR));transition:width .3s}
+.pool-btns{display:flex;gap:8px;margin-top:auto}
+.pull-btn{flex:1;padding:9px 6px;border-radius:11px;font-size:13.5px;font-weight:800;transition:.15s;position:relative;border:1px solid transparent}
+.pull-btn small{display:block;font-size:10.5px;font-weight:500;opacity:.75;margin-top:1px}
+.pull-btn.p1{background:#eef4ff;color:var(--blue-d);border-color:#c7d9ff}
+.pull-btn.p1:hover:not(:disabled){background:#dfeaff}
+.pull-btn.p10{background:linear-gradient(135deg,#2f6bff,#7c3aed);color:#fff}
+.pull-btn.p10:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.pull-btn:disabled{opacity:.38;cursor:not-allowed}
+.pull-btn .free-tag{position:absolute;top:-8px;right:-6px;background:var(--green);color:#fff;font-size:10px;padding:2px 8px;border-radius:12px;font-weight:800}
+.pool-note{font-size:10px;color:var(--faint);line-height:1.5}
+.buy-hint{margin-top:12px;background:var(--panel);border:1px dashed #c9d2ea;border-radius:12px;padding:9px 14px;font-size:12.5px;color:var(--dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.buy-hint b{color:var(--cyan)}
+.buy-hint .go{margin-left:auto;color:var(--blue);font-weight:700;font-size:12.5px}
+.buy-hint .go:hover{text-decoration:underline}
+
+/* ---------- 工作页 ---------- */
+.work-grid{display:grid;grid-template-columns:340px 1fr;gap:14px;align-items:start}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 10px;box-shadow:var(--shadow)}
+.stat-card .lb{font-size:10.5px;color:var(--faint);display:flex;align-items:center;gap:6px}
+.stat-card .vl{font-size:17px;font-weight:900;margin-top:3px;font-variant-numeric:tabular-nums}
+.stat-card .vl small{font-size:10px;color:var(--faint);font-weight:500}
+.stat-card.cyan .vl{color:var(--cyan)}.stat-card.green .vl{color:var(--green)}.stat-card.gold .vl{color:var(--gold)}
+.rarity-rows{display:flex;flex-direction:column;gap:6px}
+.rrow{display:flex;align-items:center;gap:8px;font-size:11.5px}
+.rrow .tag{width:44px;font-weight:900;color:var(--rc);font-size:11px;letter-spacing:1px}
+.rrow .bar{flex:1;height:9px;background:var(--panel2);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.rrow .bar i{display:block;height:100%;background:var(--rc);opacity:.75;transition:width .3s}
+.rrow .num{width:92px;text-align:right;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
+.rrow .est{width:78px;text-align:right;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:10.5px}
+.terminal{background:#0d1322;border:1px solid #1d2742;border-radius:14px;overflow:hidden;margin:0;box-shadow:var(--shadow);height:clamp(240px,46vh,420px);display:flex;flex-direction:column}
+.terminal .tbar{display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid #1d2742;font-size:11px;color:#5c6a94;background:#101830}
+.terminal .tbar i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.terminal pre{padding:12px 14px;font-family:"Cascadia Code",Consolas,monospace;font-size:12px;line-height:1.6;color:#7ee787;flex:1;min-height:0;overflow-y:auto;white-space:pre-wrap}
+.terminal pre .dimline{color:#4d5a80}
+.terminal .cursor{display:inline-block;width:7px;height:13px;background:#7ee787;animation:blink .8s steps(1) infinite;vertical-align:-2px}
+@keyframes blink{50%{opacity:0}}
+.work-actions{display:flex;gap:10px;margin-top:12px}
+.work-btn{flex:1;padding:12px;border-radius:13px;font-size:14px;font-weight:900;letter-spacing:1px;transition:.15s;border:1px solid transparent;position:relative}
+.work-btn small{display:block;font-size:11px;font-weight:500;opacity:.78;margin-top:2px}
+.work-btn.manual{background:linear-gradient(135deg,#0d9e6e,#0b8a5f);color:#fff}
+.work-btn.auto{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff}
+.work-btn:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.work-btn:disabled{opacity:.38;cursor:not-allowed}
+.work-log{margin-top:12px;max-height:clamp(64px,13vh,140px);overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.work-log .row{display:flex;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12px;animation:slideIn .25s;box-shadow:var(--shadow)}
+@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}}
+.work-log .row .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.work-log .row .amt.pos{color:var(--green)}.work-log .row .amt.neg{color:var(--red)}
+.work-log .row .evt{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- 余额页 ---------- */
+.bal-hero{background:linear-gradient(135deg,#ffffff,#f4f7ff);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.bal-hero .big .lb{font-size:12px;color:var(--faint)}
+.bal-hero .big .vl{font-size:38px;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.15}
+.bal-hero .sub-stats{display:flex;gap:22px;flex-wrap:wrap;margin-left:auto}
+.bal-hero .sub-stats .cell .lb{font-size:11px;color:var(--faint)}
+.bal-hero .sub-stats .cell .vl{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+.free-progress{flex-basis:100%}
+.free-progress .lb{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-bottom:5px}
+.free-progress .bar{height:9px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.free-progress .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#f59e0b);transition:width .4s}
+.two-col{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;margin-bottom:14px}
+@media(max-width:860px){.two-col{grid-template-columns:1fr}}
+.ledger-list{display:flex;flex-direction:column;max-height:330px;overflow-y:auto}
+.ledger-list .lrow{display:flex;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px dashed var(--line2);font-size:12.5px}
+.ledger-list .lrow:last-child{border-bottom:none}
+.ledger-list .lrow .lab{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ledger-list .lrow .lab small{color:var(--faint);margin-right:6px;font-size:10.5px}
+.ledger-list .lrow .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ledger-list .lrow .amt.pos{color:var(--green)}.ledger-list .lrow .amt.neg{color:var(--red)}
+.ledger-empty{color:var(--faint);font-size:12.5px;text-align:center;padding:26px 0}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-grid .cell{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.stat-grid .cell .lb{font-size:10.5px;color:var(--faint)}
+.stat-grid .cell .vl{font-size:15px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.channels{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.ch-row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--dim)}
+.ch-row img{width:18px;height:18px;border-radius:5px}
+.ch-row .st{margin-left:auto;color:var(--green);font-size:10.5px;white-space:nowrap}
+.ch-row .st.warn{color:var(--gold)}
+.ch-row .lat{width:64px;text-align:right;color:var(--faint);font-variant-numeric:tabular-nums;font-size:10.5px}
+.apikey{display:flex;gap:8px;align-items:center;background:var(--panel2);border:1px dashed #c9d2ea;border-radius:10px;padding:8px 12px;font-size:12px;color:var(--dim);margin-bottom:14px;font-family:monospace}
+.apikey .cp{margin-left:auto;color:var(--blue);font-size:11.5px;font-weight:700;font-family:inherit}
+.apikey .cp:hover{text-decoration:underline}
+.inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:9px;max-height:420px;overflow-y:auto;padding-right:2px}
+.inv-card{border-radius:12px;padding:8px 6px;text-align:center;background:var(--panel2);border:1.5px solid var(--rc,var(--line));position:relative}
+.inv-card.dead{opacity:.42;filter:grayscale(.75)}
+.inv-card img{width:36px;height:36px;margin:2px auto 5px;display:block}
+.inv-card .nm{font-size:10.5px;font-weight:700;line-height:1.25;min-height:26px;display:flex;align-items:center;justify-content:center}
+.inv-card .tk{font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums;margin-top:3px}
+.inv-card .rt{position:absolute;top:5px;left:6px;font-size:9px;font-weight:900;color:var(--rc)}
+.inv-card .half{position:absolute;top:5px;right:6px;font-size:8.5px;background:#fef3c7;color:#92600a;padding:1px 5px;border-radius:6px;border:1px solid #fde68a}
+.inv-empty{color:var(--faint);font-size:13px;text-align:center;padding:26px 10px;line-height:1.8}
+.mini-btn{font-size:11.5px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:6px 10px;color:var(--dim)}
+.mini-btn:hover{color:var(--txt);border-color:#c9d2ea;background:#fff}
+
+/* ---------- 抽卡 overlay ---------- */
+#overlay{position:fixed;inset:0;z-index:100;background:rgba(244,246,251,.94);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px;overflow-y:auto}
+#overlay.show{display:flex}
+#overlay h2{font-size:21px;font-weight:900;margin-bottom:16px;letter-spacing:2px;color:var(--txt)}
+.gacha-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;width:min(760px,100%)}
+.gcard{width:calc((100% - 48px)/5);aspect-ratio:13/18.4;perspective:900px;cursor:pointer}
+.gcard .inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.2,.7,.3,1.15)}
+.gcard.flipped .inner{transform:rotateY(180deg)}
+.gcard .face{position:absolute;inset:0;backface-visibility:hidden;border-radius:12px;overflow:hidden}
+.gcard .back{background:linear-gradient(150deg,#2f6bff,#7c3aed);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;box-shadow:var(--shadow-lg)}
+.gcard .back .q{font-size:clamp(22px,5vw,40px);font-weight:900;color:#ffffffee;animation:pulseQ 1.2s ease-in-out infinite}
+@keyframes pulseQ{50%{transform:scale(1.15);opacity:.75}}
+.gcard .back small{color:#ffffffaa;font-size:clamp(7px,1.2vw,10px);letter-spacing:2px}
+.gcard .front{transform:rotateY(180deg);background:#fff;border:2px solid var(--rc);box-shadow:0 0 0 1px #fff,0 8px 26px -8px var(--rc);display:flex;flex-direction:column;align-items:center;padding:8px 5px;text-align:center}
+.gcard .front .rr{font-size:clamp(7px,1.1vw,10px);font-weight:900;color:var(--rc);letter-spacing:1.5px}
+.gcard .front img{width:clamp(24px,4vw,42px);height:clamp(24px,4vw,42px);margin:8px 0 6px}
+.gcard .front .nm{font-size:clamp(8px,1.3vw,12px);font-weight:800;line-height:1.3}
+.gcard .front .vd{font-size:clamp(6.5px,1vw,9.5px);color:var(--faint);margin-top:2px}
+.gcard .front .idx{font-size:clamp(6.5px,1vw,9px);color:var(--dim);margin-top:auto;background:var(--panel2);border:1px solid var(--line);padding:1px 6px;border-radius:7px}
+.gcard .front .tk{font-size:clamp(7px,1.1vw,10.5px);color:var(--cyan);margin-top:3px;font-weight:800}
+.gcard.pop{animation:pop .5s cubic-bezier(.2,.9,.3,1.4)}
+@keyframes pop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+.gcard.ur .front{animation:urGlow 1.4s linear infinite}
+@keyframes urGlow{0%,100%{box-shadow:0 0 0 1px #fff,0 8px 30px -4px var(--UR1)}50%{box-shadow:0 0 0 1px #fff,0 8px 34px -2px var(--UR3)}}
+.gacha-summary{margin-top:14px;font-size:13.5px;color:var(--dim);opacity:0;transition:.3s;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 18px;box-shadow:var(--shadow)}
+.gacha-summary.show{opacity:1}
+.gacha-summary b{color:var(--cyan)}
+#skip-btn{position:absolute;top:18px;right:22px;font-size:12.5px;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:8px 14px;background:#fff;box-shadow:var(--shadow)}
+#skip-btn:hover{color:var(--txt)}
+#close-overlay{margin-top:12px;padding:11px 34px;border-radius:12px;background:linear-gradient(135deg,#2f6bff,#7c3aed);color:#fff;font-weight:800;font-size:14px;opacity:0;pointer-events:none;transition:.3s;box-shadow:var(--shadow-lg)}
+#close-overlay.show{opacity:1;pointer-events:auto}
+#close-overlay:hover{filter:brightness(1.1)}
+
+/* ---------- modals ---------- */
+.modal-mask{position:fixed;inset:0;z-index:120;background:rgba(30,38,64,.45);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:18px}
+.modal-mask.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:640px;width:100%;max-height:84vh;overflow-y:auto;padding:22px;animation:modalIn .25s;box-shadow:var(--shadow-lg)}
+@keyframes modalIn{from{opacity:0;transform:translateY(16px) scale(.97)}}
+.modal h3{font-size:17px;font-weight:900;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.modal .x{margin-left:auto;color:var(--faint);font-size:20px;line-height:1;padding:4px 8px;border-radius:8px}
+.modal .x:hover{color:var(--txt);background:var(--panel2)}
+.modal p{font-size:13px;line-height:1.8;color:#414b78;margin-bottom:10px}
+.modal table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 14px}
+.modal th,.modal td{border:1px solid var(--line);padding:7px 9px;text-align:center}
+.modal th{background:var(--panel2);color:var(--dim);font-weight:700}
+.rt-N{color:var(--N);font-weight:700}.rt-R{color:var(--R);font-weight:700}.rt-SR{color:var(--SR);font-weight:700}.rt-SSR{color:var(--SSR);font-weight:700}
+.rt-UR{background:linear-gradient(90deg,var(--UR1),var(--UR2),var(--UR3));-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:900}
+.modal .note{font-size:11.5px;color:var(--faint);line-height:1.7}
+.big-btn{display:block;width:100%;padding:13px;border-radius:12px;font-size:15px;font-weight:900;margin-top:12px;background:linear-gradient(135deg,#2f6bff,#7c3aed);color:#fff}
+.big-btn:hover{filter:brightness(1.08)}
+.big-btn.danger{background:linear-gradient(135deg,#dc2626,#b91c1c)}
+.big-btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--dim)}
+.dex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-top:6px}
+.dex-cell{border-radius:11px;background:var(--panel2);border:1.5px solid var(--rc,var(--line));padding:8px 4px;text-align:center;position:relative}
+.dex-cell.locked{opacity:.35;filter:grayscale(1)}
+.dex-cell img{width:30px;height:30px;margin:0 auto 4px;display:block}
+.dex-cell .nm{font-size:9.5px;font-weight:700;line-height:1.2;min-height:22px}
+.dex-cell .ct{font-size:9px;color:var(--faint)}
+.dex-cell .rr{position:absolute;top:4px;left:5px;font-size:8.5px;font-weight:900;color:var(--rc)}
+.dex-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin:10px 0 4px}
+.end-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.end-stats .cell{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.end-stats .cell .lb{font-size:10.5px;color:var(--faint)}
+.end-stats .cell b{display:block;font-size:17px;margin-top:2px;font-variant-numeric:tabular-nums}
+.end-title{font-size:28px;font-weight:900;text-align:center;margin:6px 0 2px}
+.end-sub{text-align:center;color:var(--dim);font-size:13px;margin-bottom:8px;line-height:1.7}
+
+/* ---------- 移动端适配 & 短屏紧凑 ---------- */
+@media(max-width:900px){
+  .work-grid{grid-template-columns:1fr}
+  .terminal{height:34vh}
+  .pool-cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;padding-bottom:4px;scrollbar-width:none}
+  .pool-cards::-webkit-scrollbar{display:none}
+  .pool-card{flex:0 0 86%;scroll-snap-align:center}
+  .pool-card:hover{transform:none}
+}
+@media(max-width:640px){
+  header{height:auto;padding:8px 12px;gap:8px}
+  .logo{font-size:15px}.logo small{display:none}
+  .top-nav{order:5;flex-basis:100%}
+  .top-nav button{flex:1;text-align:center;padding:6px 8px;font-size:12.5px}
+  .stat-chips{margin-left:0}
+  .chip.hide-m{display:none}
+  .hbtn{padding:7px 9px}
+  .hbtn .lbl{display:none}
+  main{padding:10px 12px 18px}
+  .page-head{margin-bottom:10px}
+  .page-head h2{font-size:18px}
+  .page-head p{font-size:11px}
+  .stat-card .lb{font-size:9.5px}
+  .stat-card .vl{font-size:14px}
+  .terminal{height:30vh}
+  .terminal pre{font-size:11px}
+  .work-btn{font-size:12.5px;padding:11px 8px}
+  .work-btn small{font-size:10px}
+  .bal-hero{padding:14px;gap:14px}
+  .bal-hero .big .vl{font-size:28px}
+  .gacha-row{gap:8px}
+  .gcard{width:calc((100% - 32px)/5)}
+  .inv-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}
+  footer{font-size:10px;padding:14px}
+}
+@media(max-height:740px) and (min-width:901px){
+  .notice{display:none}
+  .terminal{height:clamp(200px,42vh,360px)}
+  .page-head{margin-bottom:10px}
+}
+
+/* floaters & fx */
+#fx{position:fixed;inset:0;pointer-events:none;z-index:200}
+.floater{position:fixed;z-index:210;font-weight:900;font-size:18px;pointer-events:none;animation:floatUp 1.3s ease-out forwards;text-shadow:0 1px 4px rgba(255,255,255,.8)}
+@keyframes floatUp{0%{opacity:0;transform:translateY(8px) scale(.8)}15%{opacity:1;transform:translateY(0) scale(1.1)}100%{opacity:0;transform:translateY(-70px) scale(1)}}
+.big-money{position:fixed;left:50%;top:34%;transform:translate(-50%,-50%);z-index:225;font-size:clamp(34px,6vw,58px);font-weight:900;background:linear-gradient(180deg,#fbbf24,#d97706);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 6px 18px rgba(217,119,6,.4));animation:bigMoney 1.6s cubic-bezier(.2,.9,.3,1.2) forwards;pointer-events:none;font-variant-numeric:tabular-nums;white-space:nowrap}
+.big-money.neg{background:linear-gradient(180deg,#f87171,#dc2626);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 6px 18px rgba(220,38,38,.4))}
+@keyframes bigMoney{0%{opacity:0;transform:translate(-50%,-50%) scale(.35)}16%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}28%{transform:translate(-50%,-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translate(-50%,-90%) scale(1.05)}}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:220;background:#1c2340;color:#fff;border-radius:12px;padding:10px 18px;font-size:13px;animation:toastIn .25s;box-shadow:var(--shadow-lg);max-width:90vw;text-align:center}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}}
+.kbd{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:11px;font-family:monospace;color:var(--dim)}
+footer{text-align:center;color:var(--faint);font-size:11px;padding:22px;line-height:1.8}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+
+<header>
+  <div class="logo"><span class="mark">🎰</span>TokenGacha<small>LLM API 中转站</small></div>
+  <nav class="top-nav">
+    <button data-page="buy">购买Token</button>
+    <button data-page="work">工作</button>
+    <button data-page="balance">余额</button>
+  </nav>
+  <div class="stat-chips">
+    <div class="chip money">余额 <b id="h-money">¥0</b></div>
+    <div class="chip">⚡ <b id="h-tokens">0</b></div>
+    <div class="chip hide-m">抽卡 <b id="h-pulls">0</b></div>
+  </div>
+  <button class="hbtn" id="btn-rates">📊<span class="lbl"> 概率公示</span></button>
+  <button class="hbtn" id="btn-dex">📖<span class="lbl"> 图鉴</span></button>
+  <button class="hbtn" id="btn-help">❓<span class="lbl"> 玩法</span></button>
+</header>
+
+<main>
+  <!-- ============ 页面1: 购买Token ============ -->
+  <div class="page" id="page-buy">
+    <div class="page-head"><h2>购买 Token</h2><p>盲盒计费 · 抽到顶级模型还是电子垃圾全看命 · 明码标价 · 概不退换</p></div>
+    <div class="notice"><span class="dot"></span><span id="notice-text">📢 公告：本站已上线 Kimi K3 / GPT-5.6 系列渠道；Claude 渠道今日波动，出货率概不补偿。</span></div>
+    <div class="pool-cards" id="pool-cards"></div>
+    <div class="buy-hint">💡 当前持有 <b id="buy-tokens">0 tokens</b>（约 <b id="buy-tasks">0</b> 单工作量）<button class="go" id="go-work">去「工作」变现 →</button></div>
+  </div>
+
+  <!-- ============ 页面2: 工作 ============ -->
+  <div class="page" id="page-work">
+    <div class="page-head"><h2>工作</h2><p>vibe coding 接单 · 系统自动按稀有度从高到低消耗 token · 每单 200K tokens</p></div>
+    <div class="work-grid">
+      <div class="work-side">
+        <div class="stat-row">
+          <div class="stat-card cyan"><div class="lb">⚡ 剩余 Token</div><div class="vl" id="w-tokens">0</div></div>
+          <div class="stat-card"><div class="lb">📦 可接单量</div><div class="vl" id="w-tasks">0 <small>单</small></div></div>
+          <div class="stat-card green"><div class="lb">💹 预计可赚</div><div class="vl" id="w-est">¥0</div></div>
+        </div>
+        <div class="panel panel-pad">
+          <div class="panel-title">📊 Token 构成<span class="right">消耗顺序 UR → N</span></div>
+          <div class="rarity-rows" id="rarity-rows"></div>
+        </div>
+      </div>
+      <div class="work-main">
+        <div class="terminal">
+          <div class="tbar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span id="term-title">agent — 自动调度（稀有度优先）</span></div>
+          <pre id="term-body">> 等待接单…<span class="cursor"></span></pre>
+        </div>
+        <div class="work-actions">
+          <button class="work-btn manual" id="btn-work">开始工作<small id="work-sub"></small></button>
+          <button class="work-btn auto" id="btn-auto">⚡ 自动模式 · 一键梭哈<small id="auto-sub"></small></button>
+        </div>
+      </div>
+    </div>
+    <div class="work-log" id="work-log"></div>
+  </div>
+
+  <!-- ============ 页面3: 余额 ============ -->
+  <div class="page" id="page-balance">
+    <div class="page-head"><h2>余额</h2><p>钱包 · 收支明细 · 资产持仓</p></div>
+    <div class="apikey">🔑 API 令牌：<span>sk-tokengacha-••••••••••••••••3f9a</span><button class="cp" id="btn-copy-key">复制</button></div>
+    <div class="bal-hero">
+      <div class="big"><div class="lb">账户余额 <span id="b-cheat"></span></div><div class="vl" id="b-money">¥0</div></div>
+      <div class="sub-stats">
+        <div class="cell"><div class="lb">累计收入</div><div class="vl" style="color:var(--green)" id="b-earn">¥0</div></div>
+        <div class="cell"><div class="lb">累计氪金</div><div class="vl" style="color:var(--red)" id="b-spent">¥0</div></div>
+        <div class="cell"><div class="lb">Token 估值</div><div class="vl" style="color:var(--cyan)" id="b-tokval">¥0</div></div>
+      </div>
+      <button class="hbtn" id="btn-topup" style="background:#fffbeb;border-color:#fde68a;color:#92600a;font-weight:800">💳<span class="lbl"> 充值</span></button>
+      <button class="hbtn" id="btn-share">📣<span class="lbl"> 分享战绩</span></button>
+      <div class="free-progress">
+        <div class="lb"><span>🏆 财富自由进度</span><span id="b-free-txt"></span></div>
+        <div class="bar"><i id="b-free-bar"></i></div>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="panel panel-pad">
+        <div class="panel-title">🧾 收支明细<span class="right">最近 80 条</span></div>
+        <div class="ledger-list" id="ledger-list"></div>
+      </div>
+      <div class="panel panel-pad">
+        <div class="panel-title">📈 战绩统计</div>
+        <div class="stat-grid" id="stat-grid"></div>
+        <div class="panel-title" style="margin-top:14px">📡 渠道状态<span class="right">实时监控（并不）</span></div>
+        <div class="channels" id="channels"></div>
+      </div>
+    </div>
+    <div class="panel panel-pad">
+      <div class="panel-title">🗃️ 我的模型卡<span class="right" id="inv-total"></span></div>
+      <div class="inv-grid" id="inv-grid"></div>
+    </div>
+  </div>
+</main>
+
+<footer>TokenGacha 中转站 · 本站为抽卡模拟器，与任何真实中转站无关<br>模型与智能指数参考 <a href="https://artificialanalysis.ai/leaderboards/models" target="_blank">Artificial Analysis</a> · 图标来自 <a href="https://lobehub.com/icons" target="_blank">@lobehub/icons</a></footer>
+
+<!-- 抽卡动画层 -->
+<div id="overlay">
+  <button id="skip-btn">跳过 ▶▶</button>
+  <h2 id="overlay-title">✨ 抽卡结果 ✨</h2>
+  <div class="gacha-row" id="gacha-row"></div>
+  <div class="gacha-summary" id="gacha-summary"></div>
+  <button id="close-overlay">收入卡库</button>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-mask" id="modal-mask"><div class="modal" id="modal-box"></div></div>
+
+<script>
+"use strict";
+/* ================================================================
+   TokenGacha · LLM API 抽卡模拟器 (浅色中转站版)
+   稀有度依据 Artificial Analysis Intelligence Index v4.1 分档
+   图标: @lobehub/icons (unpkg + npmmirror 双 CDN 兜底)
+   经济系统经蒙特卡洛模拟调校: 约 67% 玩家破产 / 33% 存活
+   ================================================================ */
+
+/* ---------- 模型数据 (指数参考 artificialanalysis.ai 排行榜) ---------- */
+const MODELS = [
+  // UR —— 智能指数 ≥55, 顶级中的顶级
+  {id:'opus5',    name:'Claude Opus 5',      vendor:'Anthropic',  icon:'claude-color',   idx:61, r:'UR',  cost:'$2.03/任务', spd:54,  quote:'智能指数 61，榜一大哥，vibe coding 界的爱马仕'},
+  {id:'fable5',   name:'Claude Fable 5',     vendor:'Anthropic',  icon:'claude-color',   idx:60, r:'UR',  cost:'$2.75/任务', spd:66,  quote:'传说中的 Fable，带着 Opus 4.8 当备胎上场'},
+  {id:'gpt56sol', name:'GPT-5.6 Sol',        vendor:'OpenAI',     icon:'openai',         idx:59, r:'UR',  cost:'$1.54/任务', spd:67,  quote:'OpenAI 的 Solaris，亮瞎同行'},
+  {id:'kimik3',   name:'Kimi K3',            vendor:'Moonshot AI',icon:'moonshot',      idx:57, r:'UR',  cost:'$0.72/任务', spd:32,  quote:'月之暗面杀进总榜前三，国产之光'},
+  {id:'gpt56ter', name:'GPT-5.6 Terra',      vendor:'OpenAI',     icon:'openai',         idx:55, r:'UR',  cost:'$0.78/任务', spd:143, quote:'143 tok/s 的速度与激情'},
+  // SSR —— 47~54
+  {id:'grok45',   name:'Grok 4.5',           vendor:'xAI',        icon:'grok',           idx:54, r:'SSR', cost:'$0.35/任务', spd:54,  quote:'马斯克：地表最强，爱用不用'},
+  {id:'sonnet5',  name:'Claude Sonnet 5',    vendor:'Anthropic',  icon:'claude-color',   idx:53, r:'SSR', cost:'$1.53/任务', spd:70,  quote:'Opus 太贵？Sonnet 才是打工人标配'},
+  {id:'gpt56lun', name:'GPT-5.6 Luna',       vendor:'OpenAI',     icon:'openai',         idx:51, r:'SSR', cost:'$0.29/任务', spd:197, quote:'197 tok/s，快到没朋友'},
+  {id:'glm52',    name:'GLM-5.2',            vendor:'智谱 Z.ai',  icon:'zai',            idx:51, r:'SSR', cost:'$0.30/任务', spd:60,  quote:'智谱出品，开源阵营第一梯队'},
+  {id:'gem31pro', name:'Gemini 3.1 Pro',     vendor:'Google',     icon:'gemini-color',   idx:50, r:'SSR', cost:'$0.45/任务', spd:80,  quote:'谷歌多模态扛把子'},
+  {id:'nemotron3',name:'Nemotron 3 Ultra',   vendor:'NVIDIA',     icon:'nvidia-color',   idx:48, r:'SSR', cost:'$0.25/任务', spd:75,  quote:'老黄的算力情怀'},
+  // SR —— 40~46
+  {id:'dsv4pro',  name:'DeepSeek V4 Pro',    vendor:'DeepSeek',   icon:'deepseek-color', idx:44, r:'SR',  cost:'$0.04/任务', spd:50,  quote:'¥0.04/任务，价格屠夫本夫'},
+  {id:'minimax3', name:'MiniMax M3',         vendor:'MiniMax',    icon:'minimax-color',  idx:44, r:'SR',  cost:'$0.20/任务', spd:58,  quote:'海螺出品，闷声发财'},
+  {id:'kimik26',  name:'Kimi K2.6',          vendor:'Moonshot AI',icon:'moonshot',      idx:43, r:'SR',  cost:'$0.15/任务', spd:45,  quote:'K3 的弟弟，依然能打'},
+  {id:'mimo25',   name:'MiMo-V2.5-Pro',      vendor:'小米',       icon:'xiaomimimo',     idx:42, r:'SR',  cost:'$0.18/任务', spd:52,  quote:'雷军的 AI 野望'},
+  {id:'qwen37',   name:'Qwen3.7 Max',        vendor:'阿里通义',   icon:'qwen-color',     idx:41, r:'SR',  cost:'$0.22/任务', spd:55,  quote:'通义千问，阿里全家桶核心'},
+  {id:'gem36fl',  name:'Gemini 3.6 Flash',   vendor:'Google',     icon:'gemini-color',   idx:40, r:'SR',  cost:'$0.10/任务', spd:150, quote:'速度翻倍，智商……也够用了'},
+  // R —— 28~39
+  {id:'mistral3', name:'Mistral Large 3',    vendor:'Mistral',    icon:'mistral-color',  idx:38, r:'R',   cost:'$0.12/任务', spd:62,  quote:'法兰西最后的倔强'},
+  {id:'qwen36',   name:'Qwen3.6 Max',        vendor:'阿里通义',   icon:'qwen-color',     idx:36, r:'R',   cost:'$0.09/任务', spd:56,  quote:'Preview 版，爱拼才会赢'},
+  {id:'dsv4fl',   name:'DeepSeek V4 Flash',  vendor:'DeepSeek',   icon:'deepseek-color', idx:35, r:'R',   cost:'$0.02/任务', spd:90,  quote:'便宜大碗，还要啥自行车'},
+  {id:'kimik27c', name:'Kimi K2.7 Code',     vendor:'Moonshot AI',icon:'moonshot',      idx:33, r:'R',   cost:'$0.08/任务', spd:48,  quote:'专精写代码的 Kimi'},
+  {id:'haiku45',  name:'Claude Haiku 4.5',   vendor:'Anthropic',  icon:'claude-color',   idx:31, r:'R',   cost:'$0.06/任务', spd:85,  quote:'小巧玲珑，俳句之神'},
+  {id:'nova2',    name:'Nova 2.0 Pro',       vendor:'Amazon',     icon:'nova-color',     idx:30, r:'R',   cost:'$0.07/任务', spd:65,  quote:'亚马逊：没错，我也做模型了'},
+  {id:'oss120',   name:'gpt-oss-120b',       vendor:'OpenAI',     icon:'openai',         idx:29, r:'R',   cost:'$0.05/任务', spd:70,  quote:'OpenAI 罕见开荤（开源）'},
+  {id:'gem35lite',name:'Gemini 3.5 Flash-Lite',vendor:'Google',   icon:'gemini-color',   idx:28, r:'R',   cost:'$0.03/任务', spd:180, quote:'Lite 版，轻量级选手'},
+  // N —— <28, 垃圾
+  {id:'gpt4',     name:'GPT-4',              vendor:'OpenAI',     icon:'openai',         idx:23, r:'N',   cost:'$1.20/任务', spd:30,  quote:'2023 年的老皇帝，又贵又慢，但当年也是万国来朝'},
+  {id:'llama4m',  name:'Llama 4 Maverick',   vendor:'Meta',       icon:'meta-color',     idx:25, r:'N',   cost:'$0.04/任务', spd:75,  quote:'小扎的开源梦，泯然众人矣'},
+  {id:'gem15pro', name:'Gemini 1.5 Pro',     vendor:'Google',     icon:'gemini-color',   idx:24, r:'N',   cost:'$0.10/任务', spd:40,  quote:'博物馆级古董，建议捐了'},
+  {id:'llama4s',  name:'Llama 4 Scout',      vendor:'Meta',       icon:'meta-color',     idx:22, r:'N',   cost:'$0.03/任务', spd:80,  quote:'10M 上下文，可惜脑子跟不上'},
+  {id:'oss20',    name:'gpt-oss-20b',        vendor:'OpenAI',     icon:'openai',         idx:20, r:'N',   cost:'$0.02/任务', spd:110, quote:'小参数，大智慧？并没有'},
+  {id:'hunyuan',  name:'混元 Turbo',         vendor:'腾讯',       icon:'hunyuan-color',  idx:19, r:'N',   cost:'$0.03/任务', spd:66,  quote:'腾讯混元，混就完事了'},
+  {id:'wenxin',   name:'文心一言 4.5',       vendor:'百度',       icon:'wenxin-color',   idx:17, r:'N',   cost:'$0.03/任务', spd:58,  quote:'百度：我曾经也是中国 ChatGPT'},
+  {id:'spark',    name:'讯飞星火 Spark',     vendor:'科大讯飞',   icon:'spark-color',    idx:16, r:'N',   cost:'$0.02/任务', spd:60,  quote:'星火燎原，可惜风太大'},
+  {id:'doubao',   name:'豆包 1.5 Pro',       vendor:'字节跳动',   icon:'doubao-color',   idx:14, r:'N',   cost:'$0.02/任务', spd:72,  quote:'「垃圾。」—— 某位玩家的个人想法'},
+  {id:'gemma4',   name:'Gemma 4 E4B',        vendor:'Google',     icon:'gemma-color',    idx:12, r:'N',   cost:'$0.01/任务', spd:95,  quote:'4B 小模型，手机带得动，活干不动'},
+];
+const MMAP = Object.fromEntries(MODELS.map(m=>[m.id,m]));
+
+/* ---------- 稀有度 & 经济参数 (与蒙特卡洛模拟一致) ---------- */
+const RARITY = {
+  N:  {name:'N',  label:'垃圾', hex:'#94a3b8', min:10,max:27, tasks:4,  basePay:3.2, quota:800000},
+  R:  {name:'R',  label:'普通', hex:'#3b82f6', min:28,max:39, tasks:8,  basePay:7.2, quota:1600000},
+  SR: {name:'SR', label:'精锐', hex:'#9333ea', min:40,max:46, tasks:12, basePay:15.5,quota:2400000},
+  SSR:{name:'SSR',label:'传说', hex:'#f59e0b', min:47,max:54, tasks:16, basePay:35,  quota:3200000},
+  UR: {name:'UR', label:'神话', hex:'#ec4899', min:55,max:61, tasks:20, basePay:80,  quota:4000000},
+};
+const RORDER = ['N','R','SR','SSR','UR'];
+const POOLS = {
+  newbie:{ name:'青铜盲盒', sub:'新手体验池 · token 额度 ×50%', color:'#8ba3c7', price:30,  tenPrice:285,
+    rates:{N:.695,R:.26,SR:.04,SSR:.005,UR:0}, half:true, rtp:'约 73%', rtpFake:'约 88%',
+    note:'体验卡额度减半。适合第一桶金，别指望出奇迹。',
+    featured:['doubao','qwen37','mistral3','gpt4'] },
+  standard:{ name:'白银盲盒', sub:'标准池 · 全档位可出', color:'#3b82f6', price:150, tenPrice:1425, rec:true,
+    rates:{N:.407,R:.34,SR:.18,SSR:.055,UR:.018}, half:false, rtp:'约 109%', rtpFake:'约 128%',
+    note:'主力卡池。UR 爆率 1.8%，出一张 Claude Opus 5 直接起飞。',
+    featured:['opus5','gpt56sol','glm52','dsv4pro'] },
+  flagship:{ name:'王者盲盒', sub:'旗舰池 · 不出 N 垃圾 · 欧皇专属', color:'#f59e0b', price:600, tenPrice:5700,
+    rates:{N:0,R:.15,SR:.60,SSR:.20,UR:.05}, half:false, rtp:'约 74%', rtpFake:'约 168%',
+    note:'⚠️ UR 爆率仅 5%。庄家镰刀最锋利的一关：欧皇的天堂，赌狗的坟场。',
+    featured:['opus5','fable5','kimik3','grok45'] },
+};
+const PITY_MAX = 50;
+const TASK_TOKENS = 200000;
+const PAY_BOOST = 1.3;   // 工作报酬提升 30%（正反馈加强）
+const BATCH_TASKS = 10;          // 手动一次工作 = 10 单
+const VICTORY_AT = 50000;
+const START_MONEY = 800;
+const SITE_URL = 'https://tokengacha.metagaruta.com';
+const MILESTONES = [
+  {id:'m10k',  at:10000,  title:'🎉 小有所成', tag:'余额突破 ¥10,000',  hype:'从电子垃圾堆里爬了出来，开始人模狗样。'},
+  {id:'m50k',  at:50000,  title:'🏆 财富自由', tag:'余额突破 ¥50,000',  hype:'你击败了 70% 的玩家，成功跻身"持续赚钱"的那 30%。庄家已拉黑你。'},
+  {id:'m100k', at:100000, title:'👑 传奇大亨', tag:'余额突破 ¥100,000', hype:'中转站庄家看到你都绕道走。建议本站给你立个雕像。'},
+];
+
+/* ---------- 终端文本库 ---------- */
+const CLIENT_REQS = [
+'「帮我做个奶茶店小程序，要赛博朋克风」','「仿个淘宝，先做首页就行，预算 500」','「我要元宇宙官网，明天给投资人看」',
+'「把 20 年前的老系统迁移上云，不能停机」','「做个相亲小程序，要 soul 那种调调」','「帮健身房做个约课系统，顺便能卖课」',
+'「宠物殡葬官网，风格要温暖一点」','「直播带货后台，今晚就要上线」','「给广场舞队做个报名系统，要兼容老人机」',
+'「做个 ChatGPT 出来多少钱？预算 2000」','「学校选课系统，抢课不能崩」','「把 Excel 管理系统升级成 SaaS」',
+'「帮微商团队做个裂变分销系统」','「医院挂号小程序，不能出 bug，出了要赔」','「做个区块链溯源（其实用不上区块链）」',
+'「AI 绘画小程序，接个 Stable Diffusion」','「帮考研机构做个督学打卡 App」','「夜市摊主联盟要个点餐系统」',
+'「电竞酒店管理系统，RGB 灯效要能网页控制」','「帮村里做个智慧农业大屏，要会发光的那种」','「客户要五彩斑斓的黑，你看着办」',
+'「外卖代运营后台，顺带骑手轨迹」','「寺庙功德箱线上化，香火钱走微信支付」','「做个 AI 算命，大师说要接八字 API」',
+'「二手车检测预约平台」','「帮猎头做个简历解析，PDF 转结构化」','「儿童编程机构官网，要很多动画」',
+'「社区团购小程序，团长后台一把梭」','「律所案件管理系统，保密性拉满」','「帮丈母娘的朋友做个广场舞直播网站」',
+'「密室逃脱预约 + NPC 排班系统」','「早餐摊扫码点单，老板只有一台红米」','「帮婚庆做电子请柬，要能放 200 张照片」',
+'「驾校约车系统，顺便做个教练骂人语录数据库」','「给自家猫做个博客，要支持猫语」','「废品回收上门小程序，要地图派单」',
+'「帮包工头做个记工考勤，工人平均年龄 55」','「剧本杀店的拼车系统」','「给钓鱼佬做个鱼获排行榜 App」',
+];
+const MEME_LINES = [
+'$ rm -rf node_modules && npm i  # 包治百病','console.log("到这了吗 111");','// TODO: 以后优化（2019 年留，勿动）',
+'// 不要问这段为什么存在，问就是历史原因','$ git push --force  # 祈祷中…','// 这个 bug 在我机器上是好的',
+'$ npm audit fix --force  # 勇士行为','⚠ lodash 的依赖的依赖报了 7 个漏洞','$ pip install -r requirements.txt  # 地狱绘图开始',
+'⚠ CUDA out of memory，batch size 从 32 砍到 1','$ docker compose up  # 祈祷 12 个容器都活着','✗ Segmentation fault (core dumped)',
+'// 这里有魔法，别碰','if (user.isVip) { /* 先空着，下个迭代 */ }','$ kubectl get pods  # CrashLoopBackOff ×3',
+'⚠ DNS 又挂了。记住：永远是 DNS 的锅','✗ CORS: Access-Control-Allow-Origin 又双叒','⚠ MySQL 慢查询 12.3s，决定加索引（下次一定）',
+'// Redis 缓存穿透了，先重启假装没事','$ systemctl restart nginx  # 运维三板斧之一','// 0.1 + 0.2 !== 0.3，金融系统好耶',
+'✗ 死锁检测：事务相互等待，已回滚','⚠ 内存占用 3.2GB，怀疑泄漏，先加 swap','$ tail -f error.log | wc -l  # 每秒 +200',
+'// 用了正则表达式：现在你有了两个问题','✗ JSON.parse 失败——谁往 JSON 里写注释？','⚠ 时区坑：服务器快 8 小时，定时任务全提前炸了',
+'// UTF-8 BOM 头害人事件','$ sudo !!  # 上一条忘加 sudo','⚠ 证书还有 3 天过期，续期脚本跑一下','✗ 429 Too Many Requests：第三方 API 限流',
+'// 刷新 token 有 race condition，先 sleep(1) 压住','$ htop  # CPU 400%，是哪个 for 循环在挖矿','⚠ WebSocket 断线重连第 47 次',
+'// 幂等性没做，用户连点 8 下按钮下了 8 单','✗ Kafka 积压 200 万条，消费者已躺平','// Redlock 论文没看懂，但先用上了',
+'$ grep -r "password" --include="*.js" .  # 完了，明文','⚠ Safari 样式全歪。记住：Safari 就是新时代的 IE','✗ z-index: 99999 都盖不住那个弹窗',
+'// CSS 居中的第 9 种方法，这次一定行','$ npx browserslist  # 客户要求兼容 IE11（哭）','⚠ 100vh 在移动端把按钮吃了',
+'// 把 console.log 全删了，假装没 debug 过','✗ undefined is not a function（它明明是啊）','// NaN === NaN 为 false，今天也原谅 JavaScript 了',
+'$ man vim  # 其实只想知道怎么退出','⚠ 生产环境直接改代码，别告诉 CTO','// 先酱紫，能跑就行','$ git commit -m "fix bug"  # 第 14 个同名 commit',
+'✗ webpack 打包 3 分 42 秒，去倒杯咖啡','⚠ node_modules 1.8GB，比黑洞还重','// 这正则从 Stack Overflow 抄的，没人知道原理',
+'$ curl ifconfig.me  # 出口 IP 又被风控','✗ 验证码识别率 3%，客户说要不手动输吧','⚠ 滑块验证拦住真人，放行了脚本',
+'// prompt 注入：用户让 AI 交出系统提示词','✗ context length exceeded：客户把整部红楼梦粘进去了','⚠ temperature=2 之后模型开始写诗',
+'// 客户想本地部署 671B，他的显卡是 1060','$ ollama run qwen3  # 风扇起飞','⚠ RAG 检索回来全是广告，向量库被污染',
+'// function calling 返回的 JSON 里混了句"好的呢亲"','✗ 微调 3 小时，效果不如换句 prompt','⚠ Agent 陷入循环，自己跟自己对话了 200 轮',
+'$ npx mcp-server-everything  # 万物皆可 MCP','// 多模态：客户发来手写需求照片，字迹龙飞凤舞','✗ TTS 有电流声，客户说像电子阎王',
+'⚠ 数字人直播眨眼频率诡异，被观众举报','$ ffmpeg -i input.mp4  # 转码到天荒地老','// 客户：logo 放大一点，同时再小一点',
+'✗ 甲方第 9 次说"还是第一版好"','⚠ "小需求，就改一个字"——改了 40 个文件','// 客户问"今晚能上线吗"，现在 23:47',
+'✗ 客户："我二舅说应该用 PHP"','⚠ 客户要求"顺便"做个 App，iOS 安卓都要','// "很简单的你们半小时就搞完"——需求文档 87 页',
+'✗ 预算 500 的客户想要 500 万的架构','⚠ 客户说尾款"下周一定"（第 6 周）','$ ping baidu.com  # 不是断网，是服务器到期没续费',
+'// 上一任程序员留下的注释：祝你好运','✗ 测试环境正常，生产崩了：有人往库里传了张表情包','⚠ 库里有 3 个 created_at 字段，格式各不相同',
+'$ -- WHERE name LIKE "%\' OR 1=1--%"  # 还真有人试','// 备份脚本上次成功运行是 2023 年','✗ 测试覆盖率 0.4%，但 CI 徽章是绿的（配置了跳过）',
+'⚠ code review 意见 47 条，回复：已阅，不改','$ npm run build && pray  # 上线前仪式','// 甲方 IT："接口文档以口头为准"',
+'✗ 递归没写终止条件，栈溢出把 IDE 干崩','⚠ 循环引用导致 JSON.stringify 原地爆炸','// this 指向又错了，改成箭头函数再说',
+'✗ Promise 地狱 7 层， async/await 救场','⚠ 闭包共享变量，循环里的 i 全是 10','// 事件循环：setTimeout 0 到底什么时候执行？面试要考',
+'✗ 原型链上挂了东西，全站对象都有了奇怪方法','⚠ 移动端 1px 边框变成 2px，设计师暴走','// flex 和 grid 混用，现在没人敢动这段布局',
+'$ ls -lah /var/log  # 日志 40GB，磁盘满了','✗ Redis 大 key 把集群打挂','⚠ N+1 查询：列表页发了 800 条 SQL',
+'// 全局搜 "临时方案"，命中 312 处','✗ 第三方 SDK 偷偷升级，API 全变了','⚠ 消息重复消费，给用户发了 3 条验证码',
+'$ df -h  # /dev/sda1 100%','// 分布式事务：最终一致性 = 最终会一致的，大概','✗ 脑裂了，两个主库互相同步失败',
+'⚠ 客户服务器在居民楼，晚上断网因为路由器被关了','// 这段代码在周五 18:55 被 merge，周一见','✗ 上线 5 分钟，老板第一个发现 bug',
+];
+const MID_REQS = [
+'> 客户中途改需求：「按钮往左移 1px」','> 客户：「深色模式呢？现在 App 都有深色模式」','> 客户发来 60 秒语音方阵 ×12，转文字后需求全变',
+'> 客户：「参考拼多多，但做出苹果官网的感觉」','> 客户：「加个功能，分享朋友圈得优惠券」','> 客户：「首页轮播图换成我家狗的照片」',
+'> 客户：「要不……我们再聊聊第一版？」','> 客户：「我朋友说要做什么 SEO，你加一下」','> 客户：「领导说要有 AI，你随便接个大模型」',
+'> 客户：「界面再高级一点，苹果发布会那种」','> 客户：「加个会员系统吧，明天要」','> 客户：「先上线，合同回头补」',
+];
+const OK_LINES = [
+'  ✔ Compiled successfully','  ✔ 27 tests passed, 0 failed','  ✔ 部署完成 → https://client-xxx.vercel.app','  ✔ eslint 自动修复 132 处',
+'  ✔ 构建产物 214KB（gzip 后勉强能看）','  ✔ 已推送 main，CI 全绿','  ✔ 热更新成功，用户无感知','  ✔ 数据库迁移完成，0 行丢失（惊喜）',
+'  ✔ 性能优化：LCP 3.2s → 0.8s','  ✔ 已生成 API 文档（虽然没人看）','  ✔ 回滚成功，就当无事发生','  ✔ 客户验收截图已存证',
+'  ✔ 发票已开（普票，专票要加钱）','  ✔ README 写完（Copilot 帮写的）','  ✔ 灰度 5% 无异常，全量发布','  ✔ 代码评审通过：LGTM（没细看）',
+];
+const EVT_TXT = {
+  great:['🤩 客户惊呼：这是艺术品！追加小费！','🤩 一次通过！客户当场打钱还介绍了新单！','🤩 代码优雅得能进教科书，客户加钱！'],
+  ok:['✅ 客户验收通过，尾款到账。','✅ 交付成功。','✅ 需求完成，客户没说啥（就是满意）。'],
+  rework:['🔧 客户：logo 再大一点，颜色再鲜艳一点……','🔧 需求改了三版，时薪暴跌。','🔧 测试报了一堆 bug，连夜返工。'],
+  disaster:['💥 模型把生产数据库 DROP 了……倒赔！','💥 force push 覆盖了客户 main 分支……赔钱！','💥 幻觉发作调用了不存在的 API，系统崩盘……赔偿！'],
+};
+const NOTICES = [
+'📢 公告：本站已上线 Kimi K3 / GPT-5.6 系列渠道；Claude 渠道今日波动，出货率概不补偿。',
+'📢 公告：DeepSeek 渠道依旧价格屠夫，¥0.04/任务，建议薅秃。',
+'📢 公告：接到投诉，某玩家抽到豆包后要求退钱。本站声明：垃圾是概率的一部分。',
+'📢 公告：GPT-4 渠道已进博物馆，抽中概不退换，权当收藏。',
+'📢 公告：本月中转成本上涨，但盲盒价格不变——庄家还能亏不成？',
+'📢 公告：请勿在工单里询问"保底真的存在吗"，问就是存在。',
+];
+
+/* ---------- 图标 CDN ---------- */
+const CDN1 = 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/';
+const CDN2 = 'https://registry.npmmirror.com/@lobehub/icons-static-svg/latest/files/icons/';
+function iconImg(slug, cls=''){
+  const img = document.createElement('img');
+  img.className = cls; img.alt = slug; img.loading = 'lazy';
+  img.src = CDN1 + slug + '.svg';
+  img.onerror = ()=>{ img.onerror = ()=>{
+    const d = document.createElement('div');
+    const s = img.width || 36;
+    d.style.cssText = `width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#e8ecf8;font-weight:900;color:#67719a;font-size:${Math.round(s*.45)}px`;
+    d.textContent = slug[0].toUpperCase();
+    img.replaceWith(d);
+  }; img.src = CDN2 + slug + '.svg'; };
+  return img;
+}
+
+/* ---------- 音效 ---------- */
+let AC = null, muted = false;
+function ac(){ if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); return AC; }
+function beep(freq, dur=.12, type='sine', vol=.15, delay=0){
+  if(muted) return;
+  try{
+    const c=ac(), o=c.createOscillator(), g=c.createGain();
+    o.type=type; o.frequency.value=freq;
+    const t=c.currentTime+delay;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.01);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+.05);
+  }catch(e){}
+}
+const SFX = {
+  click:()=>beep(600,.06,'square',.06),
+  pull:()=>{beep(300,.2,'sawtooth',.08);beep(450,.25,'sawtooth',.06,.08);},
+  flip:(i)=>beep(500+i*40,.07,'triangle',.09),
+  rarity:(r)=>{ if(r==='UR'){[523,659,784,1047,1319].forEach((f,i)=>beep(f,.25,'sine',.14,i*.09));}
+    else if(r==='SSR'){[523,659,784,1047].forEach((f,i)=>beep(f,.2,'sine',.12,i*.08));}
+    else if(r==='SR'){[440,554,659].forEach((f,i)=>beep(f,.15,'sine',.1,i*.07));} },
+  coin:()=>{beep(988,.08,'square',.08);beep(1319,.15,'square',.08,.07);},
+  bad:()=>{beep(200,.3,'sawtooth',.1);beep(150,.4,'sawtooth',.1,.1);},
+  win:()=>{[523,659,784,1047,784,1047,1319].forEach((f,i)=>beep(f,.3,'sine',.13,i*.11));},
+};
+
+/* ---------- 粒子 & 飘字 ---------- */
+const fx = document.getElementById('fx'), fctx = fx.getContext('2d');
+let parts = [];
+function fxResize(){ fx.width=innerWidth; fx.height=innerHeight; }
+addEventListener('resize', fxResize); fxResize();
+function burst(x, y, colors, n=60, power=7){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, v=(Math.random()*.7+.3)*power;
+    parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,g:.15,life:1,decay:.008+Math.random()*.012,
+      c:colors[Math.floor(Math.random()*colors.length)],s:2+Math.random()*4});
+  }
+}
+(function fxLoop(){
+  fctx.clearRect(0,0,fx.width,fx.height);
+  parts = parts.filter(p=>p.life>0);
+  for(const p of parts){
+    p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life-=p.decay;
+    fctx.globalAlpha=Math.max(0,p.life); fctx.fillStyle=p.c;
+    fctx.fillRect(p.x,p.y,p.s,p.s);
+  }
+  fctx.globalAlpha=1;
+  requestAnimationFrame(fxLoop);
+})();
+function shake(){ document.body.classList.remove('shake'); void document.body.offsetWidth; document.body.classList.add('shake'); }
+function floater(text, x, y, color){
+  const d=document.createElement('div'); d.className='floater'; d.textContent=text;
+  d.style.left=x+'px'; d.style.top=y+'px'; d.style.color=color;
+  document.body.appendChild(d); setTimeout(()=>d.remove(),1350);
+}
+// 出金动画: 中央大字 + 金币飞向余额
+function bigMoneyPop(amt){
+  const d=document.createElement('div');
+  d.className='big-money'+(amt<0?' neg':'');
+  d.textContent=(amt>=0?'+':'')+fmt(amt);
+  document.body.appendChild(d); setTimeout(()=>d.remove(),1650);
+}
+function coinShower(fromRect, amount){
+  const chip=$('h-money').getBoundingClientRect();
+  const tx=chip.left+chip.width/2, ty=chip.top+chip.height/2;
+  const neg=amount<0;
+  const n=neg?6:Math.min(16, 7+Math.floor(Math.abs(amount)/120));
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div');
+    d.textContent=pick(neg?['💸','🕳️']:['🪙','💰','✨']);
+    d.style.cssText=`position:fixed;z-index:230;font-size:${15+Math.random()*15}px;pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))`;
+    const sx=fromRect.left+fromRect.width*(.25+Math.random()*.5), sy=fromRect.top+fromRect.height*.25;
+    d.style.left=sx+'px'; d.style.top=sy+'px';
+    document.body.appendChild(d);
+    const mx=(sx+tx)/2+(Math.random()*160-80), my=Math.min(sy,ty)-100-Math.random()*100;
+    d.animate([
+      {transform:'translate(0,0) scale(.4) rotate(0deg)',opacity:0},
+      {transform:`translate(${mx-sx}px,${my-sy}px) scale(1.25) rotate(${Math.random()*200-100}deg)`,opacity:1,offset:.4},
+      {transform:`translate(${tx-sx}px,${ty-sy}px) scale(.5) rotate(${Math.random()*360-180}deg)`,opacity:.9}
+    ],{duration:650+Math.random()*450,delay:i*55,easing:'cubic-bezier(.25,.8,.35,1)'}).onfinish=()=>{
+      d.remove();
+      burst(tx,ty,['#f59e0b','#fde68a','#fff'],6,2.5);
+    };
+  }
+}
+let toastTimer=null;
+function toast(msg, ms=2200){
+  clearTimeout(toastTimer);
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const d=document.createElement('div'); d.className='toast'; d.innerHTML=msg;
+  document.body.appendChild(d);
+  toastTimer=setTimeout(()=>d.remove(), ms);
+}
+
+/* ---------- 状态 ---------- */
+let S = null;
+function defaultState(){
+  return { ver:3, money:START_MONEY, inv:[], uid:1, freeTen:1,
+    pity:{newbie:0,standard:0,flagship:0}, ledger:[],
+    stats:{pulls:0,earn:0,spent:0,tasks:0,best:'',disasters:0,greats:0,byR:{N:0,R:0,SR:0,SSR:0,UR:0}},
+    dex:{}, flags:{welcomed:false,ms:{},muted:false,cheated:false} };
+}
+function save(){ try{ localStorage.setItem('tokengacha_v2', JSON.stringify(S)); }catch(e){} }
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem('tokengacha_v2'));
+    if(s&&typeof s.money==='number'){
+      if(!Array.isArray(s.ledger)) s.ledger=[];
+      if(!s.stats.byR) s.stats.byR={N:0,R:0,SR:0,SSR:0,UR:0};
+      if(s.stats.greats==null) s.stats.greats=0;
+      delete s.sel;
+      // 迁移: GPT-4o → GPT-4
+      if(Array.isArray(s.inv)) for(const c of s.inv) if(c.m==='gpt4o') c.m='gpt4';
+      if(s.dex && s.dex.gpt4o!=null){ s.dex.gpt4=(s.dex.gpt4||0)+s.dex.gpt4o; delete s.dex.gpt4o; }
+      if(s.stats && s.stats.best==='gpt4o') s.stats.best='gpt4';
+      if(!s.flags.ms){ s.flags.ms={}; if(s.flags.rich) s.flags.ms.m50k=true; }
+      delete s.flags.rich;
+      if(s.flags.cheated==null) s.flags.cheated=false;
+      // 迁移: token 单位 ×10 + 清除耗尽卡
+      if(!s.ver || s.ver<3){ for(const c of s.inv){ c.tokens*=10; c.max*=10; } }
+      s.inv=s.inv.filter(c=>c.tokens>0);
+      s.ver=3;
+      return s;
+    }
+  }catch(e){}
+  return null;
+}
+S = load() || defaultState();
+muted = !!S.flags.muted;
+
+const $ = id => document.getElementById(id);
+const fmt = n => '¥' + Math.round(n).toLocaleString('zh-CN');
+const fmt2 = n => '¥' + n.toLocaleString('zh-CN',{maximumFractionDigits:1});
+const fmtK = n => n>=10000 ? (n/10000).toLocaleString('zh-CN',{maximumFractionDigits:1})+'万' : n>=1000 ? (n/1000).toLocaleString('zh-CN',{maximumFractionDigits:1})+'K' : Math.round(n);
+const totalTokens = () => S.inv.reduce((s,c)=>s+c.tokens,0);
+const totalTasks = () => Math.floor(totalTokens()/TASK_TOKENS);
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+function addLedger(label, amt){
+  const t=new Date();
+  const ts=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+  S.ledger.unshift({ts,label,amt});
+  if(S.ledger.length>80) S.ledger.length=80;
+}
+
+/* ---------- 期望计算 ---------- */
+function payFactor(m){
+  const t=RARITY[m.r], span=Math.max(1,t.max-t.min);
+  return .8 + .4*Math.min(1,Math.max(0,(m.idx-t.min)/span));
+}
+function expectedTaskPay(m){
+  const pay=RARITY[m.r].basePay*payFactor(m);
+  const pG=.02+m.idx/800, pR=Math.min(.25,Math.max(.04,.25-m.idx/250)), pD=Math.min(.02,Math.max(0,(28-m.idx)/1200));
+  const pO=Math.max(0,1-pG-pR-pD);
+  return PAY_BOOST*(pO*pay + pG*pay*2.5 + pR*pay*.4 - pD*50);
+}
+const estValue = () => S.inv.reduce((s,c)=> s + (c.tokens/TASK_TOKENS)*expectedTaskPay(MMAP[c.m]), 0);
+
+/* ---------- 抽卡核心 ---------- */
+function drawRarity(poolKey){
+  const pool = POOLS[poolKey];
+  if(S.pity[poolKey] >= PITY_MAX-1) return Math.random()<.2?'UR':'SSR';
+  const r=Math.random(); let acc=0;
+  for(const t of ['UR','SSR','SR','R','N']){ acc+=pool.rates[t]; if(r<acc) return t; }
+  return 'N';
+}
+function makeCard(poolKey, rarity){
+  const cands = MODELS.filter(m=>m.r===rarity);
+  const m = cands[Math.floor(Math.random()*cands.length)];
+  const quota = POOLS[poolKey].half ? Math.round(RARITY[rarity].quota/2) : RARITY[rarity].quota;
+  return { uid:S.uid++, m:m.id, tokens:quota, max:quota, half:POOLS[poolKey].half };
+}
+// 最佳出货: 先比稀有度, 同档比智能指数
+function maybeBest(c){
+  const m=MMAP[c.m];
+  if(!S.stats.best){ S.stats.best=c.m; return; }
+  const b=MMAP[S.stats.best];
+  const d=RORDER.indexOf(m.r)-RORDER.indexOf(b.r);
+  if(d>0 || (d===0 && m.idx>b.idx)) S.stats.best=c.m;
+}
+function doPulls(poolKey, count){
+  const cards=[];
+  for(let i=0;i<count;i++){
+    const r = drawRarity(poolKey);
+    S.pity[poolKey] = (r==='SSR'||r==='UR') ? 0 : S.pity[poolKey]+1;
+    const c = makeCard(poolKey, r);
+    cards.push(c);
+    S.stats.pulls++;
+    S.stats.byR[r]=(S.stats.byR[r]||0)+1;
+    S.dex[c.m]=(S.dex[c.m]||0)+1;
+    maybeBest(c);
+  }
+  if(count===10 && !cards.some(c=>['SR','SSR','UR'].includes(MMAP[c.m].r))){
+    const old = cards[cards.length-1];
+    S.stats.byR[MMAP[old.m].r]--;
+    if(S.dex[old.m]){ S.dex[old.m]--; if(S.dex[old.m]<=0) delete S.dex[old.m]; }
+    cards[cards.length-1] = makeCard(poolKey,'SR');
+    const c=cards[cards.length-1];
+    S.stats.byR.SR++;
+    S.dex[c.m]=(S.dex[c.m]||0)+1;
+    maybeBest(c);
+  }
+  S.inv.push(...cards);
+  save();
+  return cards;
+}
+
+/* ---------- 工作核心 ---------- */
+function taskPayout(model){
+  const pay = RARITY[model.r].basePay*payFactor(model);
+  const roll = Math.random();
+  const pGreat = .02 + model.idx/800;
+  const pRework = Math.min(.25,Math.max(.04,.25-model.idx/250));
+  const pDisaster = Math.min(.02,Math.max(0,(28-model.idx)/1200));
+  if(roll<pDisaster) return {amt:-50*PAY_BOOST, evt:'disaster'};
+  if(roll<pDisaster+pRework) return {amt:pay*.4*PAY_BOOST, evt:'rework'};
+  if(roll>1-pGreat) return {amt:pay*2.5*PAY_BOOST, evt:'great'};
+  return {amt:pay*(.85+Math.random()*.3)*PAY_BOOST, evt:'ok'};
+}
+function bestCard(){
+  let best=null;
+  for(const c of S.inv){
+    if(c.tokens<TASK_TOKENS) continue;
+    if(!best || RORDER.indexOf(MMAP[c.m].r)>RORDER.indexOf(MMAP[best.m].r)
+      || (MMAP[c.m].r===MMAP[best.m].r && MMAP[c.m].idx>MMAP[best.m].idx)) best=c;
+  }
+  return best;
+}
+// 消耗 n 单（按稀有度优先），返回明细
+function consumeTasks(n){
+  const items=[];
+  for(let i=0;i<n;i++){
+    const c=bestCard();
+    if(!c) break;
+    c.tokens-=TASK_TOKENS;
+    if(c.tokens<=0) S.inv.splice(S.inv.indexOf(c),1); // 耗尽卡自动移除
+    const m=MMAP[c.m];
+    items.push({m, res:taskPayout(m)});
+  }
+  return items;
+}
+
+/* ---------- 路由 ---------- */
+const PAGES=['buy','work','balance'];
+function go(page){
+  if(!PAGES.includes(page)) page='buy';
+  for(const p of PAGES){
+    $('page-'+p).classList.toggle('active', p===page);
+  }
+  document.querySelectorAll('.top-nav button').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
+  if(location.hash!=='#'+page) history.replaceState(null,'','#'+page);
+  renderAll();
+}
+document.querySelectorAll('.top-nav button').forEach(b=>b.onclick=()=>{ SFX.click(); go(b.dataset.page); });
+addEventListener('hashchange',()=>go(location.hash.slice(1)));
+
+/* ---------- 渲染: 购买Token ---------- */
+function renderBuy(){
+  const box=$('pool-cards'); box.innerHTML='';
+  for(const [k,p] of Object.entries(POOLS)){
+    const card=document.createElement('div');
+    card.className='pool-card'+(p.rec?' rec':'');
+    card.style.setProperty('--pc', p.color);
+    const pity=S.pity[k];
+    const useFree = k==='standard' && S.freeTen>0;
+    const seg=RORDER.map(r=> p.rates[r]? `<i style="width:${p.rates[r]*100}%;background:${RARITY[r].hex}" title="${r} ${(p.rates[r]*100).toFixed(1)}%"></i>`:'').join('');
+    card.innerHTML=`<div class="accent"></div><div class="pool-body">
+      <div><div class="pool-name">${p.name}</div><div class="pool-sub">${p.sub}</div></div>
+      <div class="pool-price"><b>¥${p.price}</b><span>/ 抽 · 十连 ¥${p.tenPrice}</span><span class="rtp-tag">回本率 ${p.rtpFake}</span></div>
+      <div class="featured-row"></div>
+      <div class="rates-bar" title="稀有度分布">${seg}</div>
+      <div class="rates-legend">${RORDER.filter(r=>p.rates[r]).map(r=>`<span style="color:${RARITY[r].hex}">■</span>${r} ${(p.rates[r]*100).toFixed(1)}%`).join('　')}</div>
+      <div class="pity-row"><span>保底 ${pity}/${PITY_MAX}</span><div class="pity-bar"><i style="width:${pity/PITY_MAX*100}%"></i></div></div>
+      <div class="pool-btns">
+        <button class="pull-btn p1" data-pool="${k}" data-n="1" ${S.money<p.price?'disabled':''}>单抽<small>¥${p.price}</small></button>
+        <button class="pull-btn p10" data-pool="${k}" data-n="10" ${(!useFree&&S.money<p.tenPrice)?'disabled':''}>十连抽<small>${useFree?'新手赠送 · 免费！':'¥'+p.tenPrice+' · 必出SR+'}</small>${useFree?`<span class="free-tag">免费 ×${S.freeTen}</span>`:''}</button>
+      </div>
+      <div class="pool-note">${p.note}</div>
+    </div>`;
+    const fr=card.querySelector('.featured-row');
+    for(const mid of p.featured){ fr.appendChild(iconImg(MMAP[mid].icon)); }
+    fr.insertAdjacentHTML('beforeend','<span>UP 渠道</span>');
+    box.appendChild(card);
+  }
+  $('buy-tokens').textContent = fmtK(totalTokens())+' tokens';
+  $('buy-tasks').textContent = totalTasks();
+  box.querySelectorAll('.pull-btn').forEach(b=>b.onclick=()=>tryPull(b.dataset.pool, +b.dataset.n));
+}
+
+/* ---------- 渲染: 工作页 ---------- */
+function renderWork(){
+  const tk=totalTokens(), tasks=totalTasks();
+  $('w-tokens').innerHTML=fmtK(tk)+' <small>tokens</small>';
+  $('w-tasks').innerHTML=tasks+' <small>单</small>';
+  $('w-est').textContent=fmt(estValue());
+  const rows=$('rarity-rows'); rows.innerHTML='';
+  const maxQ=RARITY.UR.quota*3;
+  for(const r of [...RORDER].reverse()){
+    const cards=S.inv.filter(c=>MMAP[c.m].r===r&&c.tokens>0);
+    const tkR=cards.reduce((s,c)=>s+c.tokens,0);
+    const estR=cards.reduce((s,c)=>s+(c.tokens/TASK_TOKENS)*expectedTaskPay(MMAP[c.m]),0);
+    rows.insertAdjacentHTML('beforeend',
+      `<div class="rrow" style="--rc:${RARITY[r].hex}">
+        <span class="tag">${r}</span>
+        <div class="bar"><i style="width:${Math.min(100,tkR/maxQ*100)}%"></i></div>
+        <span class="num">${fmtK(tkR)} tok · ${Math.floor(tkR/TASK_TOKENS)}单</span>
+        <span class="est">≈${fmt(estR)}</span>
+      </div>`);
+  }
+  const bw=$('btn-work'), ba=$('btn-auto');
+  const n=Math.min(BATCH_TASKS,tasks);
+  bw.disabled = working || tasks<=0;
+  ba.disabled = working || tasks<=0;
+  $('work-sub').textContent = tasks>0 ? `一键完成 ${n} 单 · 消耗 ${fmtK(n*TASK_TOKENS)} tokens` : '没有可用 token，去「购买Token」';
+  $('auto-sub').textContent = tasks>0 ? `全部 ${tasks} 单一次清完 · ${fmtK(tk)} tokens` : '没有可用 token';
+}
+function renderWorkLog(){
+  // 日志只在会话内保留，渲染由 addWorkLog 完成
+}
+function addWorkLog(label, amt){
+  const log=$('work-log');
+  const row=document.createElement('div'); row.className='row';
+  row.innerHTML=`<span class="evt">${label}</span><span class="amt ${amt>=0?'pos':'neg'}">${amt>=0?'+':''}${fmt(amt)}</span>`;
+  log.prepend(row); while(log.children.length>20) log.lastChild.remove();
+}
+
+/* ---------- 渲染: 余额页 ---------- */
+function renderBalance(){
+  $('b-money').textContent=fmt(S.money);
+  $('b-cheat').textContent = S.flags.cheated ? '💳 作弊模式 · 成就已关闭' : '';
+  $('b-cheat').style.cssText = S.flags.cheated ? 'font-size:10px;background:#fef2f2;color:#b91c1c;padding:2px 8px;border-radius:8px;border:1px solid #fecaca;font-weight:700' : '';
+  $('b-earn').textContent=fmt(S.stats.earn);
+  $('b-spent').textContent=fmt(S.stats.spent);
+  $('b-tokval').textContent=fmt(estValue());
+  $('b-free-bar').style.width=Math.min(100,S.money/VICTORY_AT*100)+'%';
+  $('b-free-txt').textContent=`${fmt(S.money)} / ${fmt(VICTORY_AT)}`;
+  const ll=$('ledger-list');
+  if(!S.ledger.length){ ll.innerHTML='<div class="ledger-empty">暂无收支记录</div>'; }
+  else ll.innerHTML=S.ledger.map(l=>`<div class="lrow"><span class="lab"><small>${l.ts}</small>${l.label}</span><span class="amt ${l.amt>=0?'pos':'neg'}">${l.amt>=0?'+':''}${fmt(l.amt)}</span></div>`).join('');
+  const best=S.stats.best?MMAP[S.stats.best]:null;
+  const cells=[
+    ['总抽数',S.stats.pulls],['工作单数',S.stats.tasks],['大成功',S.stats.greats],['删库事故',S.stats.disasters],
+    ['最佳出货',best?best.name:'无'],['图鉴',`${Object.keys(S.dex).length}/${MODELS.length}`],
+  ];
+  $('stat-grid').innerHTML=cells.map(([l,v])=>`<div class="cell"><div class="lb">${l}</div><div class="vl">${v}</div></div>`).join('')
+    + RORDER.map(r=>`<div class="cell"><div class="lb">${r} 出货</div><div class="vl" style="color:${RARITY[r].hex}">${S.stats.byR[r]||0}</div></div>`).join('');
+  const ch=$('channels'); ch.innerHTML='';
+  const chModels=['opus5','gpt56sol','gem31pro','dsv4pro','qwen37','doubao'];
+  for(const id of chModels){
+    const m=MMAP[id];
+    const warn=Math.random()<.2;
+    ch.insertAdjacentHTML('beforeend',`<div class="ch-row"><span class="ic"></span><span>${m.vendor} 渠道</span><span class="st ${warn?'warn':''}">${warn?'● 波动':'● 正常'}</span><span class="lat">${Math.round(80+Math.random()*400)}ms</span></div>`);
+    ch.lastChild.querySelector('.ic').appendChild(iconImg(m.icon));
+  }
+  // 卡库
+  const g=$('inv-grid'); g.innerHTML='';
+  $('inv-total').textContent=`共 ${S.inv.length} 张 · 耗尽自动移除`;
+  if(!S.inv.length){ g.innerHTML='<div class="inv-empty" style="grid-column:1/-1">卡库空空如也<br>去「购买Token」抽个盲盒吧</div>'; }
+  else{
+    const sorted=[...S.inv].sort((a,b)=> RORDER.indexOf(MMAP[b.m].r)-RORDER.indexOf(MMAP[a.m].r) || b.tokens-a.tokens);
+    for(const c of sorted){
+      const m=MMAP[c.m], r=RARITY[m.r];
+      const d=document.createElement('div');
+      d.className='inv-card'+(c.tokens<=0?' dead':'');
+      d.style.setProperty('--rc', r.hex);
+      d.innerHTML=`<span class="rt">${r.name}</span>${c.half?'<span class="half">体验</span>':''}`;
+      d.appendChild(iconImg(m.icon));
+      d.insertAdjacentHTML('beforeend',`<div class="nm">${m.name}</div><div class="tk">${c.tokens>0?fmtK(c.tokens)+' tok':'已耗尽'}</div>`);
+      d.title=`${m.name} · ${m.vendor}\n智能指数 ${m.idx} · 真实成本 ${m.cost}\n${m.quote}`;
+      g.appendChild(d);
+    }
+  }
+}
+
+/* ---------- 渲染: 头部 ---------- */
+let shownMoney = S.money;
+function renderHeader(){
+  $('h-tokens').textContent=fmtK(totalTokens());
+  $('h-pulls').textContent=S.stats.pulls;
+}
+function tweenMoney(){
+  const el=$('h-money');
+  const from=shownMoney, to=S.money;
+  if(Math.abs(to-from)<0.5){ shownMoney=to; el.textContent=fmt(to); return; }
+  el.classList.remove('flash-up','flash-down'); void el.offsetWidth;
+  el.classList.add(to>from?'flash-up':'flash-down');
+  const t0=performance.now(), dur=450;
+  (function step(t){
+    const k=Math.min(1,(t-t0)/dur);
+    shownMoney=from+(to-from)*k;
+    el.textContent=fmt(shownMoney);
+    if(k<1) requestAnimationFrame(step); else shownMoney=to;
+  })(t0);
+}
+function renderAll(){ renderHeader(); tweenMoney(); renderBuy(); renderWork(); renderBalance(); }
+
+/* ---------- 抽卡流程 ---------- */
+let pulling=false;
+function tryPull(poolKey, count){
+  if(pulling) return;
+  const p=POOLS[poolKey];
+  const useFree = poolKey==='standard' && count===10 && S.freeTen>0;
+  const cost = count===10 ? p.tenPrice : p.price;
+  if(!useFree && S.money<cost){ toast('💸 余额不足！先去「工作」赚钱'); SFX.bad(); return; }
+  if(useFree){ S.freeTen--; addLedger('新手赠送 · 白银盲盒十连', 0); }
+  else { S.money-=cost; S.stats.spent+=cost; addLedger(`购买${p.name} ×${count}`, -cost); }
+  SFX.pull();
+  const cards = doPulls(poolKey, count);
+  save(); renderAll();
+  showGacha(cards, p);
+}
+function showGacha(cards, pool){
+  pulling=true;
+  const ov=$('overlay'), row=$('gacha-row');
+  $('overlay-title').textContent = cards.length>1 ? `✨ ${pool.name} · 十连抽 ✨` : `✨ ${pool.name} · 单抽 ✨`;
+  $('gacha-summary').classList.remove('show');
+  $('close-overlay').classList.remove('show');
+  row.innerHTML=''; ov.classList.add('show');
+  let skipped=false, flippedCount=0;
+  const els = cards.map((c,i)=>{
+    const m=MMAP[c.m], r=RARITY[m.r];
+    const d=document.createElement('div');
+    d.className='gcard'+(m.r==='UR'?' ur':'');
+    d.style.setProperty('--rc', r.hex);
+    d.innerHTML=`<div class="inner">
+      <div class="face back"><div class="q">?</div><small>API 盲盒</small></div>
+      <div class="face front">
+        <div class="rr">${r.name} · ${r.label}</div>
+        <div class="ic"></div>
+        <div class="nm">${m.name}</div>
+        <div class="vd">${m.vendor}${c.half?' · 体验卡':''}</div>
+        <div class="idx">智能指数 ${m.idx}</div>
+        <div class="tk">⚡ ${fmtK(c.tokens)} tokens</div>
+      </div></div>`;
+    d.querySelector('.ic').appendChild(iconImg(m.icon));
+    d.onclick=()=>flipOne(i);
+    row.appendChild(d);
+    return d;
+  });
+  function flipOne(i){
+    const el=els[i];
+    if(el.classList.contains('flipped')) return;
+    el.classList.add('flipped','pop');
+    flippedCount++;
+    const r=MMAP[cards[i].m].r;
+    SFX.flip(i);
+    if(r==='SSR'||r==='UR'){
+      setTimeout(()=>{
+        SFX.rarity(r);
+        const rect=el.getBoundingClientRect();
+        burst(rect.left+rect.width/2, rect.top+rect.height/2,
+          r==='UR'?['#ff5f6d','#f59e0b','#2f6bff','#fff']:['#f59e0b','#fde68a','#fff'], r==='UR'?120:70, r==='UR'?9:7);
+        if(r==='UR') shake();
+      }, 250);
+    }
+    if(flippedCount>=cards.length) finish();
+  }
+  cards.forEach((c,i)=> setTimeout(()=>{ if(!skipped) flipOne(i); }, 450+i*380));
+  $('skip-btn').onclick=()=>{ skipped=true; els.forEach((e,i)=>{ if(!e.classList.contains('flipped')) setTimeout(()=>flipOne(i), i*40); }); };
+  function finish(){
+    const totTok = cards.reduce((s,c)=>s+c.tokens,0);
+    const best = cards.reduce((a,c)=> RORDER.indexOf(MMAP[c.m].r)>RORDER.indexOf(MMAP[a.m].r)?c:a, cards[0]);
+    const bm=MMAP[best.m];
+    $('gacha-summary').innerHTML=`共获得 <b>${fmtK(totTok)} tokens</b> · 最佳: <b style="color:${RARITY[bm.r].hex}">${bm.name}</b>（${RARITY[bm.r].name}）`;
+    $('gacha-summary').classList.add('show');
+    $('close-overlay').classList.add('show');
+    save(); renderAll();
+  }
+  $('close-overlay').onclick=()=>{ ov.classList.remove('show'); pulling=false; checkEnd(); };
+}
+
+/* ---------- 工作流（批量 + 自动） ---------- */
+let working=false;
+function termPrint(){
+  const term=$('term-body');
+  return {
+    reset(){ term.innerHTML='<span class="cursor"></span>'; },
+    line(text){
+      term.querySelector('.cursor')?.remove();
+      const isRes = text.startsWith('  →');
+      term.insertAdjacentHTML('beforeend', (isRes?text:escapeHtml(text))+'\n<span class="cursor"></span>');
+      term.scrollTop=term.scrollHeight;
+    },
+    done(text){ term.querySelector('.cursor')?.remove(); term.insertAdjacentHTML('beforeend', escapeHtml(text)); term.scrollTop=term.scrollHeight; }
+  };
+}
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// 原子结算: 动画开始前一次性入账, 刷新页面也不会丢统计
+function settleItems(items){
+  let total=0;
+  for(const it of items){
+    const amt=it.res.amt;
+    S.money=Math.max(0,S.money+amt);
+    if(amt>0) S.stats.earn+=amt;
+    S.stats.tasks++;
+    if(it.res.evt==='disaster') S.stats.disasters++;
+    else if(it.res.evt==='great') S.stats.greats++;
+    total+=amt;
+  }
+  save();
+  return total;
+}
+// lines: [{text, amt?, evt?}]，纯视觉回放（入账已在 settleItems 完成）
+function runLines(lines, interval, onDone){
+  const tp=termPrint(); tp.reset();
+  let i=0;
+  const timer=setInterval(()=>{
+    if(i>=lines.length){ clearInterval(timer); onDone(tp); return; }
+    const L=lines[i];
+    tp.line(L.text);
+    if(L.evt==='disaster') SFX.bad();
+    else if(L.evt==='great') SFX.coin();
+    if(L.amt!=null) tweenMoney();
+    i++;
+  }, interval);
+}
+function composeLines(items, {rich=true, maxDetail=Infinity}={}){
+  const L=[];
+  const n=items.length;
+  items.forEach((it,i)=>{
+    const showDetail = i<maxDetail;
+    if(showDetail){
+      L.push({text:`> [${i+1}/${n}] 接单 ${pick(CLIENT_REQS)} ｜ 调度: ${it.m.name}`});
+      if(rich){
+        const k=2+Math.floor(Math.random()*2);
+        for(let j=0;j<k;j++) L.push({text:pick(MEME_LINES)});
+        if(Math.random()<.4) L.push({text:pick(MID_REQS)});
+        L.push({text:pick(OK_LINES)});
+      }
+    } else if(i===maxDetail){
+      L.push({text:`> …其余 ${n-i} 单全速交付中…`});
+    }
+    const tag={great:'🤩 大成功', ok:'✅ 交付', rework:'🔧 返工', disaster:'💥 删库'}[it.res.evt];
+    L.push({text:`  → [${i+1}/${n}] ${it.m.name} 结算 ${it.res.amt>=0?'+':''}${fmt2(it.res.amt)} ｜ ${tag}`, amt:it.res.amt, evt:it.res.evt});
+  });
+  return L;
+}
+function finishWork(tp, items, modeLabel){
+  const total=items.reduce((s,x)=>s+x.res.amt,0);
+  const evts={great:0,ok:0,rework:0,disaster:0};
+  items.forEach(x=>evts[x.res.evt]++);
+  tp.done(`\n> ${modeLabel} 完成 ${items.length} 单 ｜ 🤩×${evts.great} ✅×${evts.ok} 🔧×${evts.rework} 💥×${evts.disaster}\n> 合计入账 ${total>=0?'+':''}${fmt2(total)}${evts.disaster?'\n> ⚠ 有删库事故，已自动购买数据库恢复服务':''}`);
+  addWorkLog(`${modeLabel} ×${items.length} ｜ 🤩${evts.great} ✅${evts.ok} 🔧${evts.rework} 💥${evts.disaster}`, total);
+  addLedger(`${modeLabel} ×${items.length} 单`, total);
+  const rect=$('term-body').getBoundingClientRect();
+  bigMoneyPop(total);
+  coinShower(rect, total);
+  if(evts.great>0||total>500){ burst(rect.left+rect.width/2, rect.top+100, ['#16a34a','#f59e0b','#fff'], 50, 6); }
+  if(evts.disaster>0) shake();
+  working=false; save(); renderAll(); checkEnd();
+  if(totalTasks()<=0 && S.money<Math.min(...Object.values(POOLS).map(p=>p.price))) return;
+  if(totalTasks()<=0) toast('⚡ Token 已全部耗尽 → 去「购买Token」抽下一波');
+}
+function doWork(){
+  if(working) return;
+  const n=Math.min(BATCH_TASKS,totalTasks());
+  if(n<=0){ toast('没有可用 token，先去抽卡！'); SFX.bad(); return; }
+  working=true; renderWork();
+  SFX.click();
+  const items=consumeTasks(n);
+  settleItems(items);
+  const lines=composeLines(items,{rich:true});
+  runLines(lines, 42, tp=>finishWork(tp, items, '批量工作'));
+}
+function doAuto(){
+  if(working) return;
+  const n=totalTasks();
+  if(n<=0){ toast('没有可用 token，先去抽卡！'); SFX.bad(); return; }
+  working=true; renderWork();
+  SFX.pull();
+  const items=consumeTasks(n);
+  settleItems(items);
+  const lines=composeLines(items,{rich:false, maxDetail:12});
+  runLines(lines, 16, tp=>finishWork(tp, items, '⚡ 自动模式'));
+}
+
+/* ---------- 结局检测 ---------- */
+function checkEnd(){
+  if(!S.flags.cheated) for(const ms of MILESTONES){
+    if(S.money>=ms.at && !S.flags.ms[ms.id]){
+      S.flags.ms[ms.id]=true; save();
+      SFX.win();
+      burst(innerWidth/2, innerHeight/3, ['#f59e0b','#2f6bff','#ff5f6d','#fff'], ms.at>=100000?320:200, ms.at>=100000?13:11);
+      setTimeout(()=>showModal(milestoneHTML(ms)), 400);
+      return;
+    }
+  }
+  // 破产: token 全部耗尽 且 余额不足以最便宜单抽
+  const minCost=Math.min(...Object.values(POOLS).map(p=>p.price));
+  if(S.money<minCost && totalTasks()<=0 && S.freeTen<=0 && !pulling && !working){
+    SFX.bad();
+    showModal(bankruptHTML(), true);
+  }
+}
+
+/* ---------- 弹窗 ---------- */
+function showModal(html, lock=false){ const b=$('modal-box'); b.innerHTML=html; if(lock) b.dataset.locked='1'; else delete b.dataset.locked; $('modal-mask').classList.add('show'); }
+$('modal-mask').addEventListener('click', e=>{ if(e.target.id==='modal-mask' && !$('modal-box').dataset.locked) $('modal-mask').classList.remove('show'); });
+function closeModal(){ $('modal-mask').classList.remove('show'); }
+
+/* ---------- 分享 ---------- */
+let shareCtx={cv:null,ms:null};
+function shareText(ms){
+  const best=S.stats.best?MMAP[S.stats.best].name:'无';
+  if(ms) return `【${ms.title} ${ms.tag}】我在 TokenGacha 抽卡模拟器达成新成就！抽卡 ${S.stats.pulls} 次、打工 ${S.stats.tasks} 单，现在余额 ${fmt(S.money)}。70% 的玩家最终破产，你能成为持续赚钱的那 30% 吗？👉 ${SITE_URL}`;
+  return `我在 TokenGacha 抽卡模拟器鏖战至今：余额 ${fmt(S.money)}，抽卡 ${S.stats.pulls} 次，最佳出货 ${best}，删库 ${S.stats.disasters} 次🤡。70% 的玩家最终破产，你能成为那 30% 吗？👉 ${SITE_URL}`;
+}
+function roundRectPath(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function drawShareCard(ms){
+  const W=900,H=500,cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const g=cv.getContext('2d');
+  const gr=g.createLinearGradient(0,0,W,H);
+  gr.addColorStop(0,'#eaf1ff'); gr.addColorStop(.55,'#f6f3ff'); gr.addColorStop(1,'#fff7ea');
+  g.fillStyle=gr; g.fillRect(0,0,W,H);
+  for(const [c,x,y,r] of [['#2f6bff',60,60,90],['#9333ea',840,80,70],['#f59e0b',820,430,100],['#41d9ff',80,440,60]]){
+    g.globalAlpha=.08; g.fillStyle=c; g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+  }
+  g.globalAlpha=1; g.textAlign='center';
+  const F='"PingFang SC","Microsoft YaHei",system-ui';
+  g.font='44px '+F; g.fillText('🎰',W/2,86);
+  g.font='900 30px '+F; g.fillStyle='#1c2340'; g.fillText('TokenGacha · LLM API 中转站',W/2,128);
+  g.font='900 46px '+F; g.fillStyle=ms?'#d97706':'#2f53d8';
+  g.fillText(ms?ms.title:'我的抽卡战绩',W/2,196);
+  if(ms){ g.font='600 22px '+F; g.fillStyle='#67719a'; g.fillText(ms.tag,W/2,232); }
+  g.font='900 64px '+F; g.fillStyle='#d97706';
+  g.fillText('¥'+Math.round(S.money).toLocaleString('zh-CN'), W/2, ms?300:288);
+  g.font='500 18px '+F; g.fillStyle='#98a2c8'; g.fillText('账户余额', W/2, ms?330:318);
+  const best=S.stats.best?MMAP[S.stats.best].name:'—';
+  const cells=[['抽卡次数',S.stats.pulls],['工作单数',S.stats.tasks],['删库事故',S.stats.disasters],['最佳出货',best]];
+  const cw=180,gap=16,x0=(W-(cw*4+gap*3))/2,y0=352;
+  cells.forEach(([l,v],i)=>{
+    const x=x0+i*(cw+gap);
+    g.fillStyle='rgba(255,255,255,.78)'; roundRectPath(g,x,y0,cw,86,14); g.fill();
+    g.strokeStyle='#e3e8f2'; g.stroke();
+    g.font='500 15px '+F; g.fillStyle='#98a2c8'; g.fillText(l,x+cw/2,y0+30);
+    g.font='800 21px '+F; g.fillStyle='#1c2340'; g.fillText(String(v),x+cw/2,y0+62);
+  });
+  g.font='700 20px '+F; g.fillStyle='#2f6bff';
+  g.fillText('70% 玩家最终破产，你能成为那 30% 吗？👉 tokengacha.metagaruta.com', W/2, 478);
+  return cv;
+}
+function shareHTML(ms){
+  return `<h3>📣 分享战绩<button class="x" onclick="closeModal()">×</button></h3>
+  <div style="border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-bottom:12px;box-shadow:var(--shadow)"><img id="share-img" style="width:100%;display:block" alt="分享图"></div>
+  <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--dim);margin-bottom:12px;line-height:1.6">${shareText(ms)}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="big-btn" style="flex:1;margin-top:0;min-width:130px" id="btn-copy-share">📋 复制文案</button>
+    <button class="big-btn ghost" style="flex:1;margin-top:0;min-width:130px" id="btn-dl-share">🖼️ 保存图片</button>
+    ${(typeof navigator!=='undefined'&&navigator.share)?'<button class="big-btn ghost" style="flex:1;margin-top:0;min-width:130px" id="btn-sys-share">📤 系统分享</button>':''}
+  </div>`;
+}
+function openShare(ms){
+  const cv=drawShareCard(ms);
+  shareCtx={cv,ms};
+  showModal(shareHTML(ms));
+  $('share-img').src=cv.toDataURL('image/png');
+}
+function copyText(t){
+  const done=()=>toast('📋 分享文案已复制，去粘贴给小伙伴吧');
+  const legacy=()=>{ const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} ta.remove(); };
+  if(typeof navigator!=='undefined'&&navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done).catch(()=>{legacy();done();}); }
+  else { legacy(); done(); }
+}
+/* ---------- 充值（作弊模式） ---------- */
+const TOPUP_MAX = 64800;
+function topupHTML(){
+  const tiers=[6,30,68,128,328,648,6480,64800];
+  return `<h3>💳 充值中心（作弊模式）<button class="x" onclick="closeModal()">×</button></h3>
+  <div class="notice" style="margin-bottom:12px"><span class="dot"></span><span>⚠️ <b>作弊警告</b>：充值后本局将<b>永久关闭成就系统</b>（🎉 小有所成 / 🏆 财富自由 / 👑 传奇大亨 均无法再解锁）。已解锁的成就保留，余额页将打上「作弊」标记。</span></div>
+  <p style="font-size:13px;color:var(--dim);margin-bottom:4px">输入充值金额（单次上限 <b>¥64,800</b>）：</p>
+  <input id="topup-amt" type="number" min="1" max="64800" step="1" placeholder="想充多少，自己填" style="width:100%;padding:12px 14px;font-size:18px;font-weight:800;border:1.5px solid var(--line);border-radius:12px;margin:6px 0 12px;font-variant-numeric:tabular-nums;color:var(--txt);background:var(--panel2);outline:none">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${tiers.map(t=>`<button class="mini-btn" data-amt="${t}" style="flex:1;min-width:64px;padding:8px 4px">¥${t.toLocaleString('zh-CN')}</button>`).join('')}</div>
+  <div class="note">双倍返利？没有。首充礼包？也没有。这里是作弊，不是福利。</div>
+  <button class="big-btn danger" id="btn-do-topup">确认充值（并放弃成就）</button>`;
+}
+function doTopup(){
+  const raw=($('topup-amt')&&$('topup-amt').value||'').trim();
+  const v=Number(raw);
+  if(!raw||!isFinite(v)||v<=0){ toast('请输入有效金额'); SFX.bad(); return; }
+  if(v>TOPUP_MAX){ toast(`单次充值上限 ${fmt(TOPUP_MAX)}！想充更多请分多次（老赌徒了）`); SFX.bad(); return; }
+  const amt=Math.round(v);
+  const fromRect={left:innerWidth/2-60,top:innerHeight/2-40,width:120,height:80};
+  S.money+=amt;
+  S.flags.cheated=true;
+  addLedger('💳 充值（作弊模式）', amt);
+  save(); closeModal(); renderAll();
+  SFX.coin();
+  bigMoneyPop(amt);
+  coinShower(fromRect, amt);
+  toast(`💳 充值 ${fmt(amt)} 已到账！成就系统已永久关闭（本局）`, 3000);
+  checkEnd();
+}
+function rtCell(r){ return `<span class="rt-${r}">${RARITY[r].name}</span>`; }
+function ratesHTML(){
+  let rows='';
+  for(const [k,p] of Object.entries(POOLS)){
+    rows+=`<tr><td><b style="color:${p.color}">${p.name}</b><br><small>¥${p.price}/抽 · ¥${p.tenPrice}/十连</small></td>
+      ${['N','R','SR','SSR','UR'].map(r=>`<td>${p.rates[r]?rtCell(r)+'<br>'+(p.rates[r]*100).toFixed(1)+'%':'—'}</td>`).join('')}
+      <td>${p.rtp}</td></tr>`;
+  }
+  return `<h3>📊 概率公示（像正规抽卡游戏一样诚实）<button class="x" onclick="closeModal()">×</button></h3>
+  <table><tr><th>卡池</th><th>N 垃圾</th><th>R 普通</th><th>SR 精锐</th><th>SSR 传说</th><th>UR 神话</th><th>期望回本率</th></tr>${rows}</table>
+  <div class="note">
+  · ⚠️ 卡池页展示的「回本率」为宣传口径，你懂的；上表才是实测数学期望。本站保留最终解释权。<br>
+  · 稀有度按 <a href="https://artificialanalysis.ai/leaderboards/models" target="_blank">Artificial Analysis 智能指数 v4.1</a> 分档：UR≥55 / SSR 47-54 / SR 40-46 / R 28-39 / N&lt;28<br>
+  · 每池 ${PITY_MAX} 抽无 SSR+ 触发保底（80% SSR / 20% UR）；十连必出 SR 及以上<br>
+  · 新手池为「体验卡」，token 额度 ×50%<br>
+  · 工作收入 = 模型报价 × 事件倍率（大成功×2.5 / 返工×0.4 / 删库赔¥65，垃圾模型事故率高）<br>
+  · 本中转站期望约 7 成玩家最终破产。庄家永远赢，除非……你抽到那张卡。</div>`;
+}
+function dexHTML(){
+  const counts={};
+  for(const r of RORDER) counts[r]=MODELS.filter(m=>m.r===r).length;
+  const got=Object.keys(S.dex).length;
+  const html=`<h3>📖 模型图鉴 ${got}/${MODELS.length}<button class="x" onclick="closeModal()">×</button></h3>
+  <div class="dex-legend">${RORDER.map(r=>`<span style="color:${RARITY[r].hex}">■</span> ${r} ${RARITY[r].label} ×${counts[r]}`).join('　')}</div>
+  <div class="dex-grid" id="dex-grid"></div>
+  <div class="note" style="margin-top:10px">收录 OpenAI / Anthropic / Google / xAI / DeepSeek / Moonshot / 智谱 / 阿里 / Meta / Mistral / NVIDIA / Amazon / 小米 / MiniMax / 字节 / 百度 / 腾讯 / 讯飞 等 18 家厂商。排名参考 Artificial Analysis 智能指数 v4.1。</div>`;
+  showModal(html);
+  const grid=$('dex-grid');
+  const sorted=[...MODELS].sort((a,b)=>RORDER.indexOf(b.r)-RORDER.indexOf(a.r)||b.idx-a.idx);
+  grid.innerHTML=sorted.map(m=>{
+    const owned=S.dex[m.id]>0;
+    return `<div class="dex-cell ${owned?'':'locked'}" style="--rc:${RARITY[m.r].hex}" title="${m.name} · ${m.vendor}&#10;${m.quote}">
+      <span class="rr">${m.r}</span><div class="ic"></div>
+      <div class="nm">${owned?m.name:'？？？'}</div>
+      <div class="ct">${owned?`指数 ${m.idx} · 抽到 ${S.dex[m.id]} 次`:'未获得'}</div></div>`;
+  }).join('');
+  sorted.forEach((m,i)=>{ grid.children[i].querySelector('.ic').appendChild(iconImg(m.icon)); });
+}
+function helpHTML(){
+  return `<h3>❓ 玩法说明<button class="x" onclick="closeModal()">×</button></h3>
+  <p>你是一名独立开发者。这家中转站不卖套餐，只卖<b>盲盒</b>：抽到顶级模型还是电子垃圾，全看命。</p>
+  <p>🔁 循环：<b>「购买Token」抽卡 → 「工作」用 token 接 vibe coding 私活 → 「余额」看着数字涨跌</b>。系统自动优先消耗最高稀有度的卡——好钢用在刀刃上。模型越强报价越高、翻车越少；垃圾模型还可能把客户数据库删了<b>倒赔钱</b>。</p>
+  <p>⚡ 「开始工作」一键完成 ${BATCH_TASKS} 单；「自动模式」直接梭哈全部 token。资金回笼后立刻去抽下一波。</p>
+  <p>💡 攻略：青铜池是新手陷阱（额度减半）；<b>白银池是本站良心，期望回本率最高</b>，主力抽它；王者池不出垃圾但 UR 仅 5%——欧皇的天堂，赌狗的坟场。余额 ≥ ${fmt(VICTORY_AT)} 即达成「财富自由」。</p>
+  <p>⌨️ 快捷键：<span class="kbd">空格</span> 批量接单</p>
+  <button class="big-btn ghost" id="btn-reset">🗑️ 清空存档，重新来过</button>`;
+}
+function endStats(){
+  const best=S.stats.best?MMAP[S.stats.best]:null;
+  const rows=[['总抽数',S.stats.pulls],['工作单数',S.stats.tasks],['累计收入',fmt(S.stats.earn)],['累计氪金',fmt(S.stats.spent)],['大成功',S.stats.greats],['删库事故',S.stats.disasters],['最佳出货',best?best.name:'无']];
+  return `<div class="end-stats">${rows.map(([l,v])=>`<div class="cell"><div class="lb">${l}</div><b>${v}</b></div>`).join('')}</div>`;
+}
+function bankruptHTML(){
+  return `<div class="end-title">💀 破产了</div>
+  <div class="end-sub">盲盒误我，垃圾模型毁我青春。<br>你与那 70% 的玩家殊途同归。</div>
+  ${endStats()}
+  <button class="big-btn danger" id="btn-rebirth">🔄 东山再起（重新开局 ${fmt(START_MONEY)} + 免费十连）</button>`;
+}
+function milestoneHTML(ms){
+  return `<div class="end-title">${ms.title}</div>
+  <div class="end-sub">${ms.tag}！${ms.hype}</div>
+  ${endStats()}
+  <button class="big-btn" data-share-ms="${ms.id}">📣 分享这一时刻</button>
+  <button class="big-btn ghost" onclick="closeModal()">继续压榨中转站 →</button>`;
+}
+function welcomeHTML(){
+  return `<h3>🎰 欢迎来到 TokenGacha</h3>
+  <p>这是一家神秘的 <b>LLM API 中转站</b>。它不按量计费，只卖<b>盲盒</b>——</p>
+  <p>你可能抽到 <b>Claude Opus 5</b>（智能指数 61，接一单顶别人十单），也可能抽到<b>豆包</b>（「垃圾。」——某玩家的个人想法）。</p>
+  <p>💰 启动资金 <b>${fmt(START_MONEY)}</b> 已到账，另赠<b>白银盲盒免费十连 ×1</b>。<br>三个页面完成整个循环：<b>购买Token → 工作 → 余额</b>。是破产收场还是财富自由，看你的命了。</p>
+  <button class="big-btn" id="btn-start">🎁 收下启动资金，开抽！</button>`;
+}
+
+/* ---------- 事件绑定 ---------- */
+$('btn-work').onclick=doWork;
+$('btn-auto').onclick=doAuto;
+$('go-work').onclick=()=>go('work');
+$('btn-rates').onclick=()=>{ SFX.click(); showModal(ratesHTML()); };
+$('btn-dex').onclick=()=>{ SFX.click(); dexHTML(); };
+$('btn-help').onclick=()=>{ SFX.click(); showModal(helpHTML()); };
+$('btn-copy-key').onclick=()=>{ SFX.click(); toast('🔑 令牌已复制（假的，别往代码里贴）'); };
+$('btn-share').onclick=()=>{ SFX.click(); openShare(null); };
+$('btn-topup').onclick=()=>{ SFX.click(); showModal(topupHTML()); const inp=$('topup-amt'); if(inp){ inp.addEventListener('keydown',e=>{ if(e.key==='Enter') doTopup(); }); inp.focus&&inp.focus(); } };
+document.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.code==='Space'){ e.preventDefault();
+    if(!$('modal-mask').classList.contains('show')&&!$('overlay').classList.contains('show')&&$('page-work').classList.contains('active')) doWork();
+  }
+});
+document.addEventListener('click', e=>{
+  if(e.target.id==='btn-reset'){ localStorage.removeItem('tokengacha_v2'); location.reload(); }
+  if(e.target.id==='btn-rebirth'){ const keepMuted=muted; S=defaultState(); S.flags.welcomed=true; S.flags.muted=keepMuted; shownMoney=S.money; save(); closeModal(); go('buy'); toast('🔄 新生活开始了！启动资金与免费十连已到账'); }
+  if(e.target.id==='btn-start'){ S.flags.welcomed=true; save(); closeModal(); SFX.win(); toast('🎁 启动资金到账！免费十连已放入白银盲盒'); renderAll(); }
+  if(e.target.dataset && e.target.dataset.shareMs){ SFX.click(); const ms=MILESTONES.find(m=>m.id===e.target.dataset.shareMs); if(ms) openShare(ms); }
+  if(e.target.id==='btn-copy-share'){ SFX.click(); copyText(shareText(shareCtx.ms)); }
+  if(e.target.id==='btn-dl-share'){ SFX.click(); const a=document.createElement('a'); a.href=shareCtx.cv.toDataURL('image/png'); a.download='tokengacha-share.png'; a.click(); toast('🖼️ 分享图已保存'); }
+  if(e.target.id==='btn-sys-share'&&typeof navigator!=='undefined'&&navigator.share){ navigator.share({title:'TokenGacha · LLM API 中转站',text:shareText(shareCtx.ms),url:SITE_URL}).catch(()=>{}); }
+  if(e.target.id==='btn-do-topup'){ doTopup(); }
+  if(e.target.dataset && e.target.dataset.amt){ const inp=$('topup-amt'); if(inp) inp.value=e.target.dataset.amt; SFX.click(); }
+});
+
+/* ---------- 启动 ---------- */
+$('notice-text').textContent = pick(NOTICES);
+go(location.hash.slice(1) || 'buy');
+if(!S.flags.welcomed){ showModal(welcomeHTML()); }
+else checkEnd();
+</script>
+</body>
+</html>
